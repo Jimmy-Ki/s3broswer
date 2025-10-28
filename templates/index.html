@@ -1,0 +1,2335 @@
+{% extends "base.html" %}
+
+{% block title %}S3 Finder - macOS风格S3客户端{% endblock %}
+
+{% block content %}
+<!-- 工具栏 -->
+<div class="finder-toolbar">
+    <div class="toolbar-section">
+        <button class="toolbar-button" onclick="goBack()" id="back-btn" disabled>
+            <i class="bi bi-arrow-left"></i>
+            <span>返回</span>
+        </button>
+        <button class="toolbar-button" onclick="goForward()" id="forward-btn" disabled>
+            <i class="bi bi-arrow-right"></i>
+            <span>前进</span>
+        </button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-section">
+        <button class="toolbar-button" onclick="refreshFiles()">
+            <i class="bi bi-arrow-clockwise"></i>
+            <span>刷新</span>
+        </button>
+        <button class="toolbar-button" id="view-toggle" onclick="toggleView()">
+            <i class="bi bi-list"></i>
+            <span>列表</span>
+        </button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-section">
+        <button class="toolbar-button" onclick="showUploadModal()" id="upload-btn" disabled>
+            <i class="bi bi-cloud-upload"></i>
+            <span>上传</span>
+        </button>
+        <button class="toolbar-button" onclick="createFolder()" id="folder-btn" disabled>
+            <i class="bi bi-folder-plus"></i>
+            <span>新建文件夹</span>
+        </button>
+    </div>
+
+    <div class="toolbar-divider"></div>
+
+    <div class="toolbar-section ms-auto">
+        <button class="toolbar-button" onclick="showSettingsModal()">
+            <i class="bi bi-gear"></i>
+            <span>设置</span>
+        </button>
+    </div>
+</div>
+
+<!-- 主容器 -->
+<div class="finder-container">
+    <!-- 侧边栏 -->
+    <div class="finder-sidebar">
+        <!-- 收藏 -->
+        <div class="sidebar-section">
+            <div class="sidebar-title">收藏</div>
+            <a href="#" class="sidebar-item" onclick="showUploadModal()">
+                <span class="icon"><i class="bi bi-cloud-upload"></i></span>
+                上传文件
+            </a>
+            <a href="#" class="sidebar-item" onclick="showDownloads()">
+                <span class="icon"><i class="bi bi-download"></i></span>
+                下载管理
+            </a>
+        </div>
+
+        <!-- S3服务器 -->
+        <div class="sidebar-section">
+            <div class="sidebar-title">S3 服务器</div>
+            <div id="servers-list">
+                <!-- 服务器列表将通过JavaScript动态加载 -->
+            </div>
+            <a href="#" class="sidebar-item" onclick="showAddServerModal()">
+                <span class="icon"><i class="bi bi-plus-circle"></i></span>
+                添加服务器
+            </a>
+        </div>
+    </div>
+
+    <!-- 内容区域 -->
+    <div class="finder-content">
+        <!-- 路径栏 -->
+        <div class="finder-pathbar" id="pathbar">
+            <span class="path-item" onclick="goHome()">主页</span>
+            <span id="current-path"></span>
+        </div>
+
+        <!-- 文件容器 -->
+        <div class="finder-files-container" style="display: flex; flex: 1;">
+            <!-- 文件列表 -->
+            <div class="finder-files" id="finder-files" style="flex: 1;">
+                <!-- 欢迎页面 -->
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--finder-text-secondary);">
+                    <div style="font-size: 64px; margin-bottom: 20px;">
+                        <i class="bi bi-cloud"></i>
+                    </div>
+                    <h3 style="margin-bottom: 10px;">欢迎使用 S3 Finder</h3>
+                    <p style="margin-bottom: 20px;">macOS风格的S3客户端</p>
+                    <button class="btn btn-primary" onclick="showSettingsModal()">
+                        <i class="bi bi-gear"></i> 配置S3服务器
+                    </button>
+                </div>
+            </div>
+
+            <!-- 文件属性面板 -->
+            <div class="file-properties" id="file-properties" style="display: none; width: 300px; border-left: 1px solid var(--finder-border);">
+                <!-- 单个文件信息面板 -->
+                <div id="single-file-panel">
+                    <div class="properties-section">
+                        <div class="properties-title">文件信息</div>
+                        <div class="properties-item">
+                            <span class="properties-label">名称</span>
+                            <span class="properties-value" id="prop-name">-</span>
+                        </div>
+                        <div class="properties-item">
+                            <span class="properties-label">大小</span>
+                            <span class="properties-value" id="prop-size">-</span>
+                        </div>
+                        <div class="properties-item">
+                            <span class="properties-label">类型</span>
+                            <span class="properties-value" id="prop-type">-</span>
+                        </div>
+                        <div class="properties-item">
+                            <span class="properties-label">修改时间</span>
+                            <span class="properties-value" id="prop-modified">-</span>
+                        </div>
+                    </div>
+
+                    <div class="properties-section" id="prop-preview-section" style="display: none;">
+                        <div class="properties-title">预览</div>
+                        <div class="properties-preview" id="prop-preview">
+                            <!-- 预览内容将在这里显示 -->
+                        </div>
+                    </div>
+
+                    <div class="properties-section">
+                        <div class="properties-title">操作</div>
+                        <div class="preview-actions">
+                            <button class="btn btn-primary btn-sm" onclick="downloadSelectedFile()" id="download-btn" style="display: none;">
+                                <i class="bi bi-download"></i> 下载
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="openPreview()" id="preview-btn" style="display: none;">
+                                <i class="bi bi-eye"></i> 预览
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteSelectedFile()" id="delete-btn" style="display: none;">
+                                <i class="bi bi-trash"></i> 删除
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 多选操作面板 -->
+                <div id="multi-selection-panel" style="display: none;">
+                    <div class="properties-section">
+                        <div class="properties-title">
+                            <i class="bi bi-check-square"></i> 批量操作
+                        </div>
+                        <div class="properties-item">
+                            <span class="properties-label">已选择</span>
+                            <span class="properties-value" id="multi-selection-count">0 个项目</span>
+                        </div>
+                        <div class="properties-item">
+                            <span class="properties-label">总大小</span>
+                            <span class="properties-value" id="multi-selection-size">计算中...</span>
+                        </div>
+                    </div>
+
+                    <div class="properties-section">
+                        <div class="properties-title">批量操作</div>
+                        <div class="preview-actions" style="flex-direction: column; gap: 8px;">
+                            <button class="btn btn-primary btn-sm" onclick="downloadSelectedFiles()" style="width: 100%;">
+                                <i class="bi bi-download"></i> 下载选中文件
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="deleteSelectedFiles()" style="width: 100%;">
+                                <i class="bi bi-trash"></i> 删除选中项目
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="clearSelection()" style="width: 100%;">
+                                <i class="bi bi-x-square"></i> 取消选择
+                            </button>
+                        </div>
+                    </div>
+
+                    <div class="properties-section">
+                        <div class="properties-title">选中项目列表</div>
+                        <div id="selected-files-list" style="max-height: 200px; overflow-y: auto; font-size: 12px;">
+                            <!-- 选中文件列表 -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 状态栏 -->
+        <div class="finder-statusbar">
+            <span id="status-left">就绪</span>
+            <span id="status-right">0 个项目</span>
+        </div>
+    </div>
+</div>
+
+<!-- 设置模态框 -->
+<div class="modal" id="settings-modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">S3 服务器设置</h3>
+            <button class="modal-close" onclick="closeModal('settings-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div id="servers-config">
+                <!-- 服务器配置列表 -->
+            </div>
+            <button class="btn btn-secondary" onclick="showAddServerForm()" style="margin-top: 15px;">
+                <i class="bi bi-plus"></i> 添加服务器
+            </button>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('settings-modal')">关闭</button>
+        </div>
+    </div>
+</div>
+
+<!-- 添加服务器模态框 -->
+<div class="modal" id="add-server-modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">添加S3服务器</h3>
+            <button class="modal-close" onclick="closeModal('add-server-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="add-server-form">
+                <div class="form-group">
+                    <label class="form-label">服务器名称</label>
+                    <input type="text" class="form-input" name="name" required placeholder="例如: 阿里云OSS">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Access Key ID</label>
+                    <input type="text" class="form-input" name="access_key" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Access Key Secret</label>
+                    <input type="password" class="form-input" name="secret_key" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Endpoint URL</label>
+                    <input type="url" class="form-input" name="endpoint_url" required placeholder="https://oss-cn-beijing.aliyuncs.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">区域</label>
+                    <input type="text" class="form-input" name="region" value="oss-cn-beijing" placeholder="oss-cn-beijing">
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('add-server-modal')">取消</button>
+            <button class="btn btn-primary" onclick="addServer()">添加</button>
+        </div>
+    </div>
+</div>
+
+<!-- 上传文件模态框 -->
+<div class="modal" id="upload-modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">上传文件</h3>
+            <button class="modal-close" onclick="closeModal('upload-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="upload-area" id="upload-area">
+                <div class="upload-icon">
+                    <i class="bi bi-cloud-upload"></i>
+                </div>
+                <div class="upload-text">拖拽文件到这里或点击选择文件</div>
+                <div class="upload-hint">支持多文件上传</div>
+                <input type="file" id="file-input" multiple style="display: none;">
+            </div>
+            <div id="upload-list" style="margin-top: 20px;"></div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('upload-modal')">取消</button>
+            <button class="btn btn-primary" onclick="startUpload()" id="upload-btn-start">开始上传</button>
+        </div>
+    </div>
+</div>
+
+<!-- 新建文件夹模态框 -->
+<div class="modal" id="create-folder-modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">新建文件夹</h3>
+            <button class="modal-close" onclick="closeModal('create-folder-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <div class="form-group">
+                <label class="form-label">文件夹名称</label>
+                <input type="text" class="form-input" id="folder-name" placeholder="输入文件夹名称">
+            </div>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('create-folder-modal')">取消</button>
+            <button class="btn btn-primary" onclick="createFolderSubmit()">创建</button>
+        </div>
+    </div>
+</div>
+
+<!-- 文件预览模态框 -->
+<div class="preview-modal" id="preview-modal" style="display: none;">
+    <div class="preview-content">
+        <div class="preview-header">
+            <div class="preview-title">
+                <i class="bi bi-file-earmark" id="preview-icon"></i>
+                <span id="preview-filename">文件预览</span>
+            </div>
+            <button class="preview-close" onclick="closePreviewModal()">&times;</button>
+        </div>
+        <div class="preview-body" id="preview-body">
+            <div class="preview-loading">
+                <div class="spinner"></div>
+                <span>正在加载预览...</span>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- 多选计数器 -->
+<div id="selection-counter" class="selection-counter">
+    已选择 <span id="selected-count">0</span> 项
+</div>
+
+<!-- 全局拖拽上传区域 -->
+<div id="global-drop-zone" class="global-drop-zone" style="display: none;">
+    <div class="drop-zone-content">
+        <div class="drop-zone-icon">
+            <i class="bi bi-cloud-upload"></i>
+        </div>
+        <div class="drop-zone-text">
+            <h3>释放以上传文件</h3>
+            <p>拖拽文件到这里上传到当前目录</p>
+            <div id="drop-zone-file-list" class="drop-zone-file-list"></div>
+        </div>
+        <div class="drop-zone-actions">
+            <button class="btn btn-secondary" onclick="cancelDragUpload()">取消</button>
+            <button class="btn btn-primary" onclick="confirmDragUpload()">上传文件</button>
+        </div>
+    </div>
+</div>
+
+<!-- 拖拽上传进度提示 -->
+<div id="drag-upload-progress" class="drag-upload-progress" style="display: none;">
+    <div class="progress-content">
+        <div class="progress-icon">
+            <i class="bi bi-arrow-repeat"></i>
+        </div>
+        <div class="progress-text">
+            <h4>正在上传文件...</h4>
+            <p id="upload-status-text">准备上传...</p>
+            <div class="progress-bar">
+                <div id="upload-progress-bar" class="progress-fill" style="width: 0%;"></div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block scripts %}
+<script>
+    let navigationHistory = [];
+    let navigationIndex = -1;
+    let servers = []; // 存储服务器列表
+
+    // 多选功能变量
+    let isSelecting = false;
+    let selectionStartX = 0;
+    let selectionStartY = 0;
+    let selectionBox = null;
+    let selectedItems = new Set(); // 多选项目
+    let tempSelectedItems = new Set(); // 临时选择的项目（拖拽过程中）
+
+    // 拖拽上传变量
+    let dragUploadFiles = []; // 拖拽上传的文件列表
+    let isDragOver = false; // 是否正在拖拽
+    let dragUploadProgress = 0; // 上传进度
+
+    // 加载服务器列表
+    function loadServers() {
+        fetch('/api/servers')
+            .then(response => response.json())
+            .then(data => {
+                // 存储服务器数据到全局变量
+                servers = data.servers;
+
+                const serversList = document.getElementById('servers-list');
+                serversList.innerHTML = '';
+
+                data.servers.forEach(server => {
+                    const serverItem = document.createElement('a');
+                    serverItem.href = '#';
+                    serverItem.className = 'sidebar-item';
+                    serverItem.innerHTML = `
+                        <span class="icon"><i class="bi bi-server"></i></span>
+                        ${server.name}
+                    `;
+                    serverItem.onclick = () => selectServer(server.id);
+                    serversList.appendChild(serverItem);
+                });
+
+                updateSettingsModal();
+            })
+            .catch(error => {
+                console.error('加载服务器失败:', error);
+                updateStatus('加载服务器失败', 'error');
+            });
+    }
+
+    // 选择服务器
+    function selectServer(serverId) {
+        currentServerId = serverId;
+        selectedFiles.clear();
+        currentBucket = null;
+        currentPrefix = '';
+
+        // 更新UI状态
+        document.querySelectorAll('.sidebar-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        event.target.closest('.sidebar-item').classList.add('active');
+
+        // 启用工具栏按钮
+        document.getElementById('upload-btn').disabled = false;
+        document.getElementById('folder-btn').disabled = false;
+
+        // 显示存储桶列表
+        showBuckets(serverId);
+        updateStatus(`正在连接到服务器...`, 'loading');
+    }
+
+    // 显示存储桶列表
+    function showBuckets(serverId) {
+        showLoading();
+        fetch(`/api/servers/${serverId}/buckets`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                // 转换存储桶为对象格式以便统一显示
+                const bucketObjects = data.buckets.map(bucket => ({
+                    name: bucket.name,
+                    key: bucket.name,
+                    type: 'bucket',
+                    size: bucket.creation_date,
+                    last_modified: bucket.creation_date
+                }));
+
+                displayBuckets(bucketObjects);
+                updateStatus(`已连接，找到 ${data.buckets.length} 个存储桶`, 'ready');
+            })
+            .catch(error => {
+                console.error('加载存储桶失败:', error);
+                updateStatus('加载存储桶失败: ' + error.message, 'error');
+                document.getElementById('finder-files').innerHTML = `
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--finder-text-secondary);">
+                        <div style="font-size: 48px; margin-bottom: 20px;">
+                            <i class="bi bi-exclamation-triangle"></i>
+                        </div>
+                        <p>连接失败: ${error.message}</p>
+                    </div>
+                `;
+            });
+    }
+
+    // 显示存储桶
+    function displayBuckets(buckets) {
+        const filesContainer = document.getElementById('finder-files');
+
+        if (buckets.length === 0) {
+            filesContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--finder-text-secondary);">
+                    <div style="font-size: 48px; margin-bottom: 20px;">
+                        <i class="bi bi-bucket"></i>
+                    </div>
+                    <h3 style="margin-bottom: 10px;">暂无存储桶</h3>
+                    <p>此服务器下没有存储桶</p>
+                </div>
+            `;
+            document.getElementById('file-properties').style.display = 'none';
+            return;
+        }
+
+        // 设置全局变量供其他函数使用
+        window.currentFileObjects = buckets;
+
+        if (viewMode === 'grid') {
+            displayBucketGridView(buckets);
+        } else {
+            displayBucketListView(buckets);
+        }
+
+        document.getElementById('status-right').textContent = `${buckets.length} 个存储桶`;
+    }
+
+    // 存储桶网格视图
+    function displayBucketGridView(buckets) {
+        const filesContainer = document.getElementById('finder-files');
+        let html = '<div class="files-grid">';
+
+        buckets.forEach(bucket => {
+            html += `
+                <div class="file-item" onclick="selectBucket('${bucket.key}', event)" ondblclick="enterBucket('${bucket.key}')">
+                    <div class="file-icon">
+                        <i class="bi bi-bucket"></i>
+                    </div>
+                    <div class="file-name">${bucket.name}</div>
+                    <div class="file-size">${bucket.last_modified}</div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        filesContainer.innerHTML = html;
+    }
+
+    // 存储桶列表视图
+    function displayBucketListView(buckets) {
+        const filesContainer = document.getElementById('finder-files');
+        let html = '<div class="files-list">';
+
+        buckets.forEach(bucket => {
+            html += `
+                <div class="file-row" onclick="selectBucket('${bucket.key}', event)" ondblclick="enterBucket('${bucket.key}')">
+                    <div class="file-row-icon">
+                        <i class="bi bi-bucket"></i>
+                    </div>
+                    <div class="file-row-name">${bucket.name}</div>
+                    <div class="file-row-size">存储桶</div>
+                    <div class="file-row-date">${bucket.last_modified}</div>
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        filesContainer.innerHTML = html;
+    }
+
+    // 进入存储桶
+    function enterBucket(bucketName) {
+        currentBucket = bucketName;
+        currentPrefix = '';
+        navigationHistory = [{'bucket': bucketName, 'prefix': ''}];
+        navigationIndex = 0;
+
+        loadFiles();
+        updateNavigationButtons();
+    }
+
+    
+    // 选择存储桶
+    function selectBucket(bucketName) {
+        currentBucket = bucketName;
+        currentPrefix = '';
+        navigationHistory = [{'bucket': bucketName, 'prefix': ''}];
+        navigationIndex = 0;
+
+        // 更新UI
+        document.querySelectorAll('#buckets-list .sidebar-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        if (event && event.target) {
+            event.target.closest('.sidebar-item').classList.add('active');
+        }
+
+        loadFiles();
+        updateNavigationButtons();
+    }
+
+    // 导航到存储桶（面包屑点击）
+    function navigateToBucket(bucketName) {
+        currentBucket = bucketName;
+        currentPrefix = '';
+        navigationHistory = [{'bucket': bucketName, 'prefix': ''}];
+        navigationIndex = 0;
+
+        // 更新侧边栏选中状态
+        document.querySelectorAll('#buckets-list .sidebar-item').forEach(item => {
+            item.classList.remove('active');
+            if (item.textContent.includes(bucketName)) {
+                item.classList.add('active');
+            }
+        });
+
+        loadFiles();
+        updateNavigationButtons();
+    }
+
+    // 加载文件列表
+    function loadFiles() {
+        if (!currentServerId || !currentBucket) return;
+
+        showLoading();
+        updateStatus(`正在加载文件列表...`, 'loading');
+
+        const params = new URLSearchParams({
+            bucket: currentBucket,
+            prefix: currentPrefix
+        });
+
+        fetch(`/api/servers/${currentServerId}/objects?${params}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                displayFiles(data.objects);
+                updatePathbar();
+                updateStatus(`显示 ${data.objects.length} 个项目`, 'ready');
+            })
+            .catch(error => {
+                console.error('加载文件失败:', error);
+                updateStatus('加载文件失败: ' + error.message, 'error');
+            });
+    }
+
+    // 显示文件列表
+    function displayFiles(objects) {
+        const filesContainer = document.getElementById('finder-files');
+
+        // 设置全局变量供其他函数使用
+        window.currentFileObjects = objects;
+
+        if (objects.length === 0) {
+            filesContainer.innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--finder-text-secondary);">
+                    <div style="font-size: 48px; margin-bottom: 20px;">
+                        <i class="bi bi-folder-x"></i>
+                    </div>
+                    <p>此文件夹为空</p>
+                </div>
+            `;
+            // 隐藏属性面板
+            document.getElementById('file-properties').style.display = 'none';
+            return;
+        }
+
+        if (viewMode === 'grid') {
+            displayGridView(objects);
+        } else {
+            displayListView(objects);
+        }
+
+        document.getElementById('status-right').textContent = `${objects.length} 个项目`;
+    }
+
+    // 双击文件处理
+    function handleFileDoubleClick(key, type) {
+        if (type === 'folder') {
+            // 双击文件夹进入
+            currentPrefix = key || '';
+            navigationHistory = navigationHistory.slice(0, navigationIndex + 1);
+            navigationHistory.push({'bucket': currentBucket, 'prefix': currentPrefix});
+            navigationIndex++;
+            loadFiles();
+            updateNavigationButtons();
+        } else {
+            // 双击文件打开预览
+            openFullPreview(key);
+        }
+    }
+
+    // 网格视图
+    function displayGridView(objects) {
+        const filesContainer = document.getElementById('finder-files');
+        let html = '<div class="files-grid">';
+
+        objects.forEach(obj => {
+            let icon;
+            if (obj.type === 'folder') {
+                icon = 'bi-folder-fill';
+            } else if (obj.type === 'bucket') {
+                icon = 'bi-bucket';
+            } else {
+                icon = getFileIconClass(obj.name);
+            }
+            const safeKey = obj.key || '';
+            const safeType = obj.type || 'file';
+            html += `
+                <div class="file-item" data-key="${safeKey}" onclick="handleFileClickNew('${safeKey}', '${safeType}', this, event)" ondblclick="handleFileDoubleClick('${safeKey}', '${safeType}')">
+                    <div class="file-icon">
+                        <i class="bi ${icon}"></i>
+                    </div>
+                    <div class="file-name">${obj.name || 'Unknown'}</div>
+                    ${obj.type === 'file' ? `<div class="file-size">${obj.size || '0 B'}</div>` : ''}
+                    ${obj.type === 'bucket' ? `<div class="file-size">${obj.last_modified || ''}</div>` : ''}
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        filesContainer.innerHTML = html;
+    }
+
+    // 列表视图
+    function displayListView(objects) {
+        const filesContainer = document.getElementById('finder-files');
+        let html = '<div class="files-list">';
+
+        objects.forEach(obj => {
+            let icon;
+            if (obj.type === 'folder') {
+                icon = 'bi-folder-fill';
+            } else if (obj.type === 'bucket') {
+                icon = 'bi-bucket';
+            } else {
+                icon = getFileIconClass(obj.name);
+            }
+            const safeKey = obj.key || '';
+            const safeType = obj.type || 'file';
+            html += `
+                <div class="file-row" data-key="${safeKey}" onclick="handleFileClickNew('${safeKey}', '${safeType}', this, event)" ondblclick="handleFileDoubleClick('${safeKey}', '${safeType}')">
+                    <div class="file-row-icon">
+                        <i class="bi ${icon}"></i>
+                    </div>
+                    <div class="file-row-name">${obj.name || 'Unknown'}</div>
+                    ${obj.type === 'file' ? `
+                        <div class="file-row-size">${obj.size || '0 B'}</div>
+                        <div class="file-row-date">${obj.last_modified || 'Unknown'}</div>
+                    ` : obj.type === 'bucket' ? `
+                        <div class="file-row-size">存储桶</div>
+                        <div class="file-row-date">${obj.last_modified || ''}</div>
+                    ` : `
+                        <div class="file-row-size">文件夹</div>
+                    `}
+                </div>
+            `;
+        });
+
+        html += '</div>';
+        filesContainer.innerHTML = html;
+    }
+
+    // 处理文件点击
+    function handleFileClick(key, type, element, event) {
+        event.stopPropagation();
+
+        // 先清除预览状态（除非点击的是当前预览的文件）
+        if (selectedFile !== key) {
+            clearPreviewState();
+        }
+
+        if (event.ctrlKey || event.metaKey) {
+            // Ctrl/Cmd + 点击：多选模式
+            toggleFileSelection(key, element);
+            showMultiSelectionActions();
+        } else if (event.shiftKey && selectedItems.size > 0) {
+            // Shift + 点击：范围选择
+            // TODO: 实现范围选择逻辑
+        } else {
+            // 普通点击：显示文件简介，不选中
+            showFilePreview(key, element);
+        }
+    }
+
+    // 选择单个文件
+    function selectSingleFile(key, element) {
+        // 清除之前的选择
+        selectedItems.clear();
+        selectedFile = key;
+        selectedItems.add(key);
+
+        // 更新UI
+        document.querySelectorAll('.file-item.selected, .file-row.selected, .file-item.multi-selected, .file-row.multi-selected').forEach(el => {
+            el.classList.remove('selected', 'multi-selected');
+        });
+
+        if (element) {
+            element.classList.add('selected');
+        }
+
+        // 隐藏多选操作，显示单个文件预览
+        hideMultiSelectionActions();
+        showFileProperties(key);
+
+        updateContextMenuState();
+    }
+
+    // 清除预览状态
+    function clearPreviewState() {
+        // 清除所有预览状态
+        document.querySelectorAll('.previewing').forEach(el => {
+            el.classList.remove('previewing');
+        });
+        selectedFile = null;
+    }
+
+    // 显示文件预览（简介模式）
+    function showFilePreview(key, element) {
+        if (!currentServerId || !currentBucket) return;
+
+        // 清除所有选中状态和之前的预览状态
+        document.querySelectorAll('.file-item.selected, .file-row.selected, .file-item.multi-selected, .file-row.multi-selected, .previewing').forEach(el => {
+            el.classList.remove('selected', 'multi-selected', 'previewing');
+        });
+
+        // 添加预览状态（不选中）
+        if (element) {
+            element.classList.add('previewing');
+        }
+
+        // 从当前显示的文件列表中找到文件信息
+        const objects = getCurrentFileObjects();
+        const fileObj = objects.find(obj => obj.key === key);
+
+        if (fileObj) {
+            // 显示右侧面板
+            document.getElementById('file-properties').style.display = 'block';
+
+            // 显示单个文件面板，隐藏多选面板
+            document.getElementById('single-file-panel').style.display = 'block';
+            document.getElementById('multi-selection-panel').style.display = 'none';
+
+            // 更新文件信息
+            document.getElementById('prop-name').textContent = fileObj.name;
+            document.getElementById('prop-size').textContent = fileObj.size || '-';
+            document.getElementById('prop-type').textContent = getFileTypeLabel(fileObj.name);
+            document.getElementById('prop-modified').textContent = fileObj.last_modified || '-';
+
+            // 设置当前预览的文件
+            selectedFile = key;
+
+            // 显示操作按钮
+            if (fileObj.type === 'file') {
+                document.getElementById('download-btn').style.display = 'inline-block';
+                document.getElementById('preview-btn').style.display = 'inline-block';
+                document.getElementById('delete-btn').style.display = 'inline-block';
+            } else {
+                document.getElementById('download-btn').style.display = 'none';
+                document.getElementById('preview-btn').style.display = 'none';
+                document.getElementById('delete-btn').style.display = 'inline-block';
+            }
+
+            // 加载预览内容
+            if (fileObj.type === 'file' && isPreviewable(fileObj.name)) {
+                loadFilePreview(key);
+            } else {
+                document.getElementById('prop-preview-section').style.display = 'none';
+            }
+        }
+    }
+
+    // 显示文件属性（兼容函数）
+    function showFileProperties(key) {
+        showFilePreview(key, null);
+    }
+
+    // 获取当前文件对象列表
+    function getCurrentFileObjects() {
+        // 这个函数需要在displayFiles中设置全局变量
+        return window.currentFileObjects || [];
+    }
+
+    // 获取文件类型标签
+    function getFileTypeLabel(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const types = {
+            'jpg': 'JPEG图片', 'jpeg': 'JPEG图片', 'png': 'PNG图片', 'gif': 'GIF图片',
+            'pdf': 'PDF文档', 'doc': 'Word文档', 'docx': 'Word文档',
+            'xls': 'Excel表格', 'xlsx': 'Excel表格', 'ppt': 'PowerPoint', 'pptx': 'PowerPoint',
+            'txt': '文本文件', 'md': 'Markdown文件', 'js': 'JavaScript', 'py': 'Python',
+            'json': 'JSON文件', 'xml': 'XML文件', 'csv': 'CSV文件',
+            'mp4': 'MP4视频', 'mp3': 'MP3音频', 'zip': 'ZIP压缩包',
+            'db': 'SQLite数据库', 'sqlite': 'SQLite数据库'
+        };
+        return types[ext] || ext.toUpperCase() + '文件';
+    }
+
+    // 判断文件是否可预览
+    function isPreviewable(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const previewable = [
+            'jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico',
+            'txt', 'md', 'json', 'xml', 'html', 'htm', 'css', 'js', 'py',
+            'java', 'cpp', 'c', 'h', 'php', 'rb', 'go', 'rs', 'sql', 'sh',
+            'csv', 'tsv', 'db', 'sqlite', 'sqlite3'
+        ];
+        return previewable.includes(ext);
+    }
+
+    // 加载文件预览
+    function loadFilePreview(key) {
+        const params = new URLSearchParams({
+            bucket: currentBucket,
+            key: key
+        });
+
+        fetch(`/api/servers/${currentServerId}/preview?${params}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    document.getElementById('prop-preview-section').style.display = 'none';
+                    return;
+                }
+
+                document.getElementById('prop-preview-section').style.display = 'block';
+                const previewContainer = document.getElementById('prop-preview');
+
+                if (data.preview_type === 'pdf_embed') {
+                    // PDF预览 - 使用iframe
+                    previewContainer.innerHTML = `<iframe src="${data.preview_url}" style="width: 100%; height: 200px; border: 1px solid var(--finder-border); border-radius: 6px;" frameborder="0"></iframe>`;
+                } else if (data.content_type.startsWith('image/')) {
+                    previewContainer.innerHTML = `<img src="${data.preview}" alt="${data.filename}" style="max-width: 100%; border-radius: 6px;">`;
+                } else if (data.content_type.startsWith('text/') || data.content_type.includes('json') || data.content_type.includes('xml') || data.content_type.includes('javascript')) {
+                    previewContainer.innerHTML = getCodeHighlighting(data.preview, data.filename);
+                } else {
+                    previewContainer.innerHTML = `<div style="color: var(--finder-text-secondary); font-size: 12px;">${data.preview}</div>`;
+                }
+            })
+            .catch(error => {
+                console.error('加载预览失败:', error);
+                document.getElementById('prop-preview-section').style.display = 'none';
+            });
+    }
+
+    // 更新路径栏
+    function updatePathbar() {
+        const pathbar = document.getElementById('current-path');
+        let path = '';
+
+        // 清空路径栏
+        pathbar.innerHTML = '';
+
+        if (currentServerId) {
+            // 获取服务器名称
+            const server = servers.find(s => s.id === currentServerId);
+            if (server) {
+                path += `<span class="path-separator">›</span>`;
+                path += `<span class="path-item" onclick="backToServers()">${server.name}</span>`;
+            }
+        }
+
+        if (currentBucket) {
+            path += `<span class="path-separator">›</span>`;
+            path += `<span class="path-item" onclick="navigateToBucket('${currentBucket}')">${currentBucket}</span>`;
+        }
+
+        if (currentPrefix && currentPrefix !== '' && currentPrefix !== 'undefined') {
+            const parts = currentPrefix.split('/').filter(part => part && part !== 'undefined');
+            let prefixPath = '';
+
+            parts.forEach((part, index) => {
+                // 跳过与桶名称相同的部分
+                if (part !== currentBucket) {
+                    prefixPath += part + '/';
+                    path += `<span class="path-separator">›</span>`;
+                    path += `<span class="path-item" onclick="navigateToPath('${prefixPath}')">${part}</span>`;
+                }
+            });
+        }
+
+        pathbar.innerHTML = path;
+    }
+
+    // 导航到指定路径
+    function navigateToPath(prefix) {
+        currentPrefix = prefix || '';
+        navigationHistory = navigationHistory.slice(0, navigationIndex + 1);
+        navigationHistory.push({'bucket': currentBucket, 'prefix': currentPrefix});
+        navigationIndex++;
+        loadFiles();
+        updateNavigationButtons();
+    }
+
+    // 更新导航按钮状态
+    function updateNavigationButtons() {
+        const backBtn = document.getElementById('back-btn');
+        const forwardBtn = document.getElementById('forward-btn');
+
+        // 如果在文件视图内，启用后退按钮
+        backBtn.disabled = !currentBucket && !currentPrefix;
+
+        // 如果在文件视图内且有历史记录，启用前进按钮
+        forwardBtn.disabled = navigationIndex <= 0 || navigationIndex >= navigationHistory.length - 1;
+    }
+
+    // 导航功能
+    function goBack() {
+        if (navigationIndex > 0) {
+            navigationIndex--;
+            const state = navigationHistory[navigationIndex];
+            currentBucket = state.bucket;
+            currentPrefix = state.prefix;
+            loadFiles();
+            updateNavigationButtons();
+        } else if (currentBucket && !currentPrefix) {
+            // 如果在存储桶根目录，返回到存储桶列表
+            backToServers();
+        }
+    }
+
+    function goForward() {
+        if (navigationIndex < navigationHistory.length - 1) {
+            navigationIndex++;
+            const state = navigationHistory[navigationIndex];
+            currentBucket = state.bucket;
+            currentPrefix = state.prefix;
+            loadFiles();
+            updateNavigationButtons();
+        }
+    }
+
+    function goHome() {
+        currentBucket = null;
+        currentPrefix = '';
+        navigationHistory = [];
+        navigationIndex = -1;
+        selectedFiles.clear();
+
+        // 显示欢迎页面或服务器列表
+        if (currentServerId) {
+            showBuckets(currentServerId);
+        } else {
+            document.getElementById('finder-files').innerHTML = `
+                <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--finder-text-secondary);">
+                    <div style="font-size: 64px; margin-bottom: 20px;">
+                        <i class="bi bi-cloud"></i>
+                    </div>
+                    <h3 style="margin-bottom: 10px;">欢迎使用 S3 Finder</h3>
+                    <p>请从左侧选择S3服务器</p>
+                </div>
+            `;
+        }
+
+        document.getElementById('file-properties').style.display = 'none';
+        updateNavigationButtons();
+        updateStatus('就绪', 'ready');
+    }
+
+    // 返回服务器视图
+    function backToServers() {
+        currentBucket = null;
+        currentPrefix = '';
+        navigationHistory = [];
+        navigationIndex = -1;
+        selectedFiles.clear();
+
+        if (currentServerId) {
+            showBuckets(currentServerId);
+        }
+
+        document.getElementById('file-properties').style.display = 'none';
+        updateNavigationButtons();
+        updateStatus('就绪', 'ready');
+    }
+
+    // 刷新文件列表
+    function refreshFiles() {
+        if (currentServerId && currentBucket) {
+            loadFiles();
+        } else if (currentServerId) {
+            loadBuckets(currentServerId);
+        }
+    }
+
+    // 更新状态栏
+    function updateStatus(message, type = 'ready') {
+        document.getElementById('status-left').textContent = message;
+    }
+
+    // 模态框功能
+    function showModal(modalId) {
+        document.getElementById(modalId).style.display = 'flex';
+    }
+
+    function closeModal(modalId) {
+        document.getElementById(modalId).style.display = 'none';
+    }
+
+    function showSettingsModal() {
+        loadServers();
+        showModal('settings-modal');
+    }
+
+    function showAddServerModal() {
+        showModal('add-server-modal');
+    }
+
+    function showUploadModal() {
+        if (!currentServerId || !currentBucket) {
+            alert('请先选择服务器和存储桶');
+            return;
+        }
+        showModal('upload-modal');
+    }
+
+    function showAddServerForm() {
+        closeModal('settings-modal');
+        showModal('add-server-modal');
+    }
+
+    // 添加服务器
+    function addServer() {
+        const form = document.getElementById('add-server-form');
+        const formData = new FormData(form);
+
+        fetch('/api/servers', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: formData.get('name'),
+                access_key: formData.get('access_key'),
+                secret_key: formData.get('secret_key'),
+                endpoint_url: formData.get('endpoint_url'),
+                region: formData.get('region')
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            closeModal('add-server-modal');
+            form.reset();
+            loadServers();
+            updateStatus('服务器添加成功', 'ready');
+        })
+        .catch(error => {
+            console.error('添加服务器失败:', error);
+            alert('添加服务器失败: ' + error.message);
+        });
+    }
+
+    // 更新设置模态框
+    function updateSettingsModal() {
+        fetch('/api/servers')
+            .then(response => response.json())
+            .then(data => {
+                const configDiv = document.getElementById('servers-config');
+                let html = '';
+
+                data.servers.forEach(server => {
+                    html += `
+                        <div style="border: 1px solid var(--finder-border); border-radius: 8px; padding: 15px; margin-bottom: 10px;">
+                            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+                                <h4 style="margin: 0;">${server.name}</h4>
+                                <div>
+                                    <button class="btn btn-sm btn-secondary" onclick="editServer(${server.id})">编辑</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteServer(${server.id})">删除</button>
+                                </div>
+                            </div>
+                            <div style="font-size: 12px; color: var(--finder-text-secondary);">
+                                <div>Endpoint: ${server.endpoint_url}</div>
+                                <div>Region: ${server.region}</div>
+                                <div>Access Key: ${server.access_key}</div>
+                            </div>
+                        </div>
+                    `;
+                });
+
+                configDiv.innerHTML = html || '<p style="text-align: center; color: var(--finder-text-secondary);">暂无配置的服务器</p>';
+            });
+    }
+
+    // 删除服务器
+    function deleteServer(serverId) {
+        if (confirm('确定要删除这个服务器配置吗？')) {
+            fetch(`/api/servers/${serverId}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+                loadServers();
+                updateStatus('服务器删除成功', 'ready');
+            })
+            .catch(error => {
+                console.error('删除服务器失败:', error);
+                alert('删除服务器失败: ' + error.message);
+            });
+        }
+    }
+
+    // 创建文件夹
+    function createFolder() {
+        if (!currentServerId || !currentBucket) {
+            alert('请先选择服务器和存储桶');
+            return;
+        }
+        showModal('create-folder-modal');
+        document.getElementById('folder-name').focus();
+    }
+
+    function createFolderSubmit() {
+        const folderName = document.getElementById('folder-name').value.trim();
+        if (!folderName) {
+            alert('请输入文件夹名称');
+            return;
+        }
+
+        const folderPath = currentPrefix + folderName + '/';
+
+        fetch(`/api/servers/${currentServerId}/folders`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                bucket: currentBucket,
+                folder_path: folderPath
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            closeModal('create-folder-modal');
+            document.getElementById('folder-name').value = '';
+            loadFiles();
+            updateStatus('文件夹创建成功', 'ready');
+        })
+        .catch(error => {
+            console.error('创建文件夹失败:', error);
+            alert('创建文件夹失败: ' + error.message);
+        });
+    }
+
+    // 上传功能
+    document.getElementById('upload-area').addEventListener('click', function() {
+        document.getElementById('file-input').click();
+    });
+
+    document.getElementById('file-input').addEventListener('change', function(e) {
+        const files = Array.from(e.target.files);
+        displayUploadList(files);
+    });
+
+    function displayUploadList(files) {
+        const uploadList = document.getElementById('upload-list');
+        let html = '<h5>待上传文件:</h5>';
+
+        files.forEach((file, index) => {
+            html += `
+                <div style="display: flex; justify-content: space-between; align-items: center; padding: 8px; background: var(--finder-bg); border-radius: 4px; margin-bottom: 5px;">
+                    <span>${file.name}</span>
+                    <span>${formatFileSize(file.size)}</span>
+                </div>
+            `;
+        });
+
+        uploadList.innerHTML = html;
+    }
+
+    function startUpload() {
+        const fileInput = document.getElementById('file-input');
+        const files = Array.from(fileInput.files);
+
+        if (files.length === 0) {
+            alert('请选择要上传的文件');
+            return;
+        }
+
+        uploadFiles(files);
+    }
+
+    function uploadFiles(files) {
+        const uploadPromises = files.map(file => {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('bucket', currentBucket);
+            formData.append('prefix', currentPrefix || '');
+
+            return fetch(`/api/servers/${currentServerId}/upload`, {
+                method: 'POST',
+                body: formData
+            });
+        });
+
+        Promise.all(uploadPromises)
+            .then(responses => Promise.all(responses.map(r => r.json())))
+            .then(results => {
+                const errors = results.filter(r => r.error);
+                if (errors.length > 0) {
+                    alert('部分文件上传失败: ' + errors.map(e => e.error).join(', '));
+                } else {
+                    updateStatus(`成功上传 ${files.length} 个文件`, 'ready');
+                }
+
+                closeModal('upload-modal');
+                document.getElementById('file-input').value = '';
+                document.getElementById('upload-list').innerHTML = '';
+                loadFiles();
+            })
+            .catch(error => {
+                console.error('上传失败:', error);
+                alert('上传失败: ' + error.message);
+            });
+    }
+
+    // 下载功能
+    function downloadSelected() {
+        if (selectedFiles.size === 0) {
+            alert('请先选择要下载的文件');
+            return;
+        }
+
+        selectedFiles.forEach(key => {
+            const url = `/api/servers/${currentServerId}/download?bucket=${currentBucket}&key=${encodeURIComponent(key)}`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = key.split('/').pop();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+    }
+
+    // 批量下载选中文件
+    function downloadSelectedFiles() {
+        if (selectedItems.size === 0) {
+            alert('请先选择要下载的文件');
+            return;
+        }
+
+        // 过滤出文件（不包括文件夹）
+        const fileKeys = [];
+        selectedItems.forEach(key => {
+            const fileObj = getCurrentFileObjects().find(obj => obj.key === key);
+            if (fileObj && fileObj.type === 'file') {
+                fileKeys.push(key);
+            }
+        });
+
+        if (fileKeys.length === 0) {
+            alert('选中的项目中没有可下载的文件');
+            return;
+        }
+
+        // 逐个下载文件
+        fileKeys.forEach(key => {
+            const url = `/api/servers/${currentServerId}/download?bucket=${currentBucket}&key=${encodeURIComponent(key)}`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = key.split('/').pop();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        });
+
+        updateStatus(`正在下载 ${fileKeys.length} 个文件`, 'ready');
+    }
+
+    // 批量删除选中项目
+    function deleteSelectedFiles() {
+        if (selectedItems.size === 0) {
+            alert('请先选择要删除的项目');
+            return;
+        }
+
+        const count = selectedItems.size;
+        if (!confirm(`确定要删除选中的 ${count} 个项目吗？\n\n此操作不可撤销！`)) {
+            return;
+        }
+
+        fetch(`/api/servers/${currentServerId}/delete`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                bucket: currentBucket,
+                keys: Array.from(selectedItems)
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            clearSelection();
+            loadFiles();
+            updateStatus(`成功删除 ${count} 个项目`, 'ready');
+            document.getElementById('file-properties').style.display = 'none';
+        })
+        .catch(error => {
+            console.error('批量删除失败:', error);
+            alert('删除失败: ' + error.message);
+        });
+    }
+
+    // 删除功能
+    function deleteSelected() {
+        if (selectedFiles.size === 0) {
+            alert('请先选择要删除的项目');
+            return;
+        }
+
+        if (!confirm(`确定要删除选中的 ${selectedFiles.size} 个项目吗？`)) {
+            return;
+        }
+
+        fetch(`/api/servers/${currentServerId}/delete`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                bucket: currentBucket,
+                keys: Array.from(selectedFiles)
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            selectedFiles.clear();
+            loadFiles();
+            updateStatus('删除成功', 'ready');
+        })
+        .catch(error => {
+            console.error('删除失败:', error);
+            alert('删除失败: ' + error.message);
+        });
+    }
+
+    function showDownloads() {
+        // 这里可以实现下载管理功能
+        alert('下载管理功能正在开发中');
+    }
+
+    function selectAllFiles() {
+        // 实现全选功能
+        alert('全选功能正在开发中');
+    }
+
+    // 打开预览模态框
+    function openPreview() {
+        if (selectedFile) {
+            openFullPreview(selectedFile);
+        }
+    }
+
+    // 打开完整预览
+    function openFullPreview(key) {
+        if (!currentServerId || !currentBucket) return;
+
+        const objects = getCurrentFileObjects();
+        const fileObj = objects.find(obj => obj.key === key);
+
+        if (!fileObj) return;
+
+        document.getElementById('preview-filename').textContent = fileObj.name;
+        document.getElementById('preview-modal').style.display = 'flex';
+
+        const previewBody = document.getElementById('preview-body');
+        previewBody.innerHTML = '<div class="preview-loading"><div class="spinner"></div><span>正在加载预览...</span></div>';
+
+        const params = new URLSearchParams({
+            bucket: currentBucket,
+            key: key
+        });
+
+        fetch(`/api/servers/${currentServerId}/preview?${params}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.error) {
+                    previewBody.innerHTML = `
+                        <div class="preview-error">
+                            <i class="bi bi-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                            <h4>预览失败</h4>
+                            <p>${data.error}</p>
+                            ${data.download_url ? `
+                                <div class="preview-actions">
+                                    <a href="${data.download_url}" class="btn btn-primary" download>
+                                        <i class="bi bi-download"></i> 下载文件
+                                    </a>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                    return;
+                }
+
+                // 根据类型显示预览
+                if (data.preview_type === 'pdf_embed') {
+                    // PDF全屏预览
+                    previewBody.innerHTML = `<iframe src="${data.preview_url}" style="width: 100%; height: 80vh; border: none; border-radius: 8px;" frameborder="0"></iframe>`;
+                } else if (data.content_type.startsWith('image/')) {
+                    previewBody.innerHTML = `<img src="${data.preview}" alt="${data.filename}">`;
+                } else if (data.content_type.startsWith('text/') || data.content_type.includes('json') || data.content_type.includes('xml') || data.content_type.includes('javascript')) {
+                    previewBody.innerHTML = getCodeHighlighting(data.preview, data.filename);
+                } else if (data.content_type.startsWith('audio/')) {
+                    previewBody.innerHTML = `
+                        <div>
+                            <i class="bi bi-music-note" style="font-size: 48px; margin-bottom: 16px; color: var(--finder-text-secondary);"></i>
+                            <h4>音频文件</h4>
+                            <p style="color: var(--finder-text-secondary); margin-bottom: 20px;">${data.filename}</p>
+                            <audio controls style="width: 100%; max-width: 400px;">
+                                <source src="${data.download_url}" type="${data.content_type}">
+                                您的浏览器不支持音频播放
+                            </audio>
+                        </div>
+                    `;
+                } else if (data.content_type.startsWith('video/')) {
+                    previewBody.innerHTML = `
+                        <video controls style="max-width: 100%; max-height: 70vh;">
+                            <source src="${data.download_url}" type="${data.content_type}">
+                            您的浏览器不支持视频播放
+                        </video>
+                    `;
+                } else {
+                    previewBody.innerHTML = `
+                        <div class="preview-error">
+                            <i class="bi bi-file-earmark" style="font-size: 48px; margin-bottom: 16px;"></i>
+                            <h4>无法预览此文件类型</h4>
+                            <p>${data.preview || '此文件类型不支持预览'}</p>
+                            <div class="preview-actions">
+                                <a href="${data.download_url}" class="btn btn-primary" download>
+                                    <i class="bi bi-download"></i> 下载文件
+                                </a>
+                            </div>
+                        </div>
+                    `;
+                }
+
+                // 更新预览图标
+                const iconClass = getFileIconClass(data.filename);
+                document.getElementById('preview-icon').className = iconClass;
+            })
+            .catch(error => {
+                console.error('加载预览失败:', error);
+                previewBody.innerHTML = `
+                    <div class="preview-error">
+                        <i class="bi bi-exclamation-triangle" style="font-size: 48px; margin-bottom: 16px;"></i>
+                        <h4>预览加载失败</h4>
+                        <p>${error.message}</p>
+                    </div>
+                `;
+            });
+    }
+
+    // 获取文件图标类 - 完整版
+    function getFileIconClass(filename) {
+        const ext = filename.split('.').pop().toLowerCase();
+        const icons = {
+            // 图片文件
+            'jpg': 'bi-file-image', 'jpeg': 'bi-file-image', 'png': 'bi-file-image', 'gif': 'bi-file-image',
+            'bmp': 'bi-file-image', 'webp': 'bi-file-image', 'svg': 'bi-file-image', 'ico': 'bi-file-image',
+            'tiff': 'bi-file-image', 'tif': 'bi-file-image', 'psd': 'bi-file-image', 'ai': 'bi-file-image',
+            'eps': 'bi-file-image', 'raw': 'bi-file-image', 'heic': 'bi-file-image', 'avif': 'bi-file-image',
+
+            // 文档文件
+            'pdf': 'bi-file-pdf', 'doc': 'bi-file-word', 'docx': 'bi-file-word', 'docm': 'bi-file-word',
+            'dot': 'bi-file-word', 'dotx': 'bi-file-word', 'xls': 'bi-file-excel', 'xlsx': 'bi-file-excel',
+            'xlsm': 'bi-file-excel', 'xlsb': 'bi-file-excel', 'xlt': 'bi-file-excel', 'xltx': 'bi-file-excel',
+            'ppt': 'bi-file-ppt', 'pptx': 'bi-file-ppt', 'pptm': 'bi-file-ppt', 'pot': 'bi-file-ppt',
+            'potx': 'bi-file-ppt', 'pps': 'bi-file-ppt', 'ppsx': 'bi-file-ppt', 'odt': 'bi-file-text',
+            'ods': 'bi-file-spreadsheet', 'odp': 'bi-file-ppt', 'odg': 'bi-file-image', 'odf': 'bi-file-text',
+            'rtf': 'bi-file-text', 'wps': 'bi-file-word', 'et': 'bi-file-excel', 'dps': 'bi-file-ppt',
+
+            // 文本文件
+            'txt': 'bi-file-text', 'md': 'bi-file-text', 'log': 'bi-file-text', 'ini': 'bi-file-text',
+            'cfg': 'bi-file-text', 'conf': 'bi-file-text', 'yaml': 'bi-file-text', 'yml': 'bi-file-text',
+            'toml': 'bi-file-text', 'env': 'bi-file-text', 'gitignore': 'bi-file-text',
+            'dockerignore': 'bi-file-text', 'eslintignore': 'bi-file-text', 'prettierignore': 'bi-file-text',
+
+            // 代码文件
+            'js': 'bi-file-code', 'jsx': 'bi-file-code', 'ts': 'bi-file-code', 'tsx': 'bi-file-code',
+            'vue': 'bi-file-code', 'svelte': 'bi-file-code', 'py': 'bi-file-code', 'java': 'bi-file-code',
+            'kt': 'bi-file-code', 'scala': 'bi-file-code', 'cpp': 'bi-file-code', 'c': 'bi-file-code',
+            'cc': 'bi-file-code', 'cxx': 'bi-file-code', 'h': 'bi-file-code', 'hpp': 'bi-file-code',
+            'cs': 'bi-file-code', 'php': 'bi-file-code', 'rb': 'bi-file-code', 'go': 'bi-file-code',
+            'rs': 'bi-file-code', 'swift': 'bi-file-code', 'dart': 'bi-file-code', 'lua': 'bi-file-code',
+            'perl': 'bi-file-code', 'pl': 'bi-file-code', 'r': 'bi-file-code', 'm': 'bi-file-code',
+            'matlab': 'bi-file-code', 'sql': 'bi-file-code', 'sh': 'bi-file-code', 'bash': 'bi-file-code',
+            'zsh': 'bi-file-code', 'fish': 'bi-file-code', 'ps1': 'bi-file-code', 'bat': 'bi-file-code',
+            'cmd': 'bi-file-code', 'dockerfile': 'bi-file-code', 'makefile': 'bi-file-code',
+            'cmake': 'bi-file-code', 'gradle': 'bi-file-code', 'pom': 'bi-file-code', 'package': 'bi-file-code',
+            'lock': 'bi-file-code', 'gemfile': 'bi-file-code', 'rakefile': 'bi-file-code',
+
+            // 网页文件
+            'html': 'bi-file-code', 'htm': 'bi-file-code', 'xhtml': 'bi-file-code', 'css': 'bi-file-code',
+            'scss': 'bi-file-code', 'sass': 'bi-file-code', 'less': 'bi-file-code', 'styl': 'bi-file-code',
+            'xml': 'bi-file-code', 'xsl': 'bi-file-code', 'xslt': 'bi-file-code', 'dtd': 'bi-file-code',
+            'json': 'bi-file-code', 'jsonld': 'bi-file-code', 'jsonp': 'bi-file-code', 'jsonc': 'bi-file-code',
+            'graphql': 'bi-file-code', 'gql': 'bi-file-code', 'wsdl': 'bi-file-code', 'wadl': 'bi-file-code',
+            'rss': 'bi-file-code', 'atom': 'bi-file-code', 'sitemap': 'bi-file-code',
+
+            // 数据文件
+            'csv': 'bi-file-spreadsheet', 'tsv': 'bi-file-spreadsheet', 'psv': 'bi-file-spreadsheet',
+            'xls': 'bi-file-excel', 'xlsx': 'bi-file-excel', 'numbers': 'bi-file-spreadsheet',
+            'sqlite': 'bi-database', 'sqlite3': 'bi-database', 'db': 'bi-database',
+            'mdb': 'bi-database', 'accdb': 'bi-database', 'jsonl': 'bi-file-code',
+            'ndjson': 'bi-file-code', 'parquet': 'bi-file-spreadsheet', 'avro': 'bi-file-code',
+            'orc': 'bi-file-code', 'arrow': 'bi-file-code', 'feather': 'bi-file-code',
+
+            // 压缩文件
+            'zip': 'bi-file-zip', 'rar': 'bi-file-zip', '7z': 'bi-file-zip', 'tar': 'bi-file-zip',
+            'gz': 'bi-file-zip', 'tgz': 'bi-file-zip', 'bz2': 'bi-file-zip', 'tbz2': 'bi-file-zip',
+            'xz': 'bi-file-zip', 'txz': 'bi-file-zip', 'lzma': 'bi-file-zip', 'lzip': 'bi-file-zip',
+            'arj': 'bi-file-zip', 'cab': 'bi-file-zip', 'lha': 'bi-file-zip', 'ace': 'bi-file-zip',
+            'zoo': 'bi-file-zip', 'arc': 'bi-file-zip', 'pak': 'bi-file-zip', 'war': 'bi-file-zip',
+            'ear': 'bi-file-zip', 'jar': 'bi-file-zip', 'apk': 'bi-file-zip', 'ipa': 'bi-file-zip',
+            'deb': 'bi-file-zip', 'rpm': 'bi-file-zip', 'dmg': 'bi-file-zip', 'pkg': 'bi-file-zip',
+            'msi': 'bi-file-zip', 'iso': 'bi-file-zip', 'img': 'bi-file-zip', 'vmdk': 'bi-file-zip',
+            'ova': 'bi-file-zip', 'ovf': 'bi-file-zip', 'vdi': 'bi-file-zip', 'vhd': 'bi-file-zip',
+            'vhdx': 'bi-file-zip', 'qcow': 'bi-file-zip', 'qcow2': 'bi-file-zip',
+
+            // 音频文件
+            'mp3': 'bi-file-music', 'wav': 'bi-file-music', 'flac': 'bi-file-music', 'aac': 'bi-file-music',
+            'ogg': 'bi-file-music', 'wma': 'bi-file-music', 'm4a': 'bi-file-music', 'mp4a': 'bi-file-music',
+            'opus': 'bi-file-music', 'mka': 'bi-file-music', 'aiff': 'bi-file-music', 'au': 'bi-file-music',
+            'ra': 'bi-file-music', 'ram': 'bi-file-music', 'mid': 'bi-file-music', 'midi': 'bi-file-music',
+            'kar': 'bi-file-music', 'amr': 'bi-file-music', '3gp': 'bi-file-play', 'm4p': 'bi-file-music',
+
+            // 视频文件
+            'mp4': 'bi-file-play', 'avi': 'bi-file-play', 'mov': 'bi-file-play', 'wmv': 'bi-file-play',
+            'flv': 'bi-file-play', 'webm': 'bi-file-play', 'mkv': 'bi-file-play', 'm4v': 'bi-file-play',
+            '3gp': 'bi-file-play', '3g2': 'bi-file-play', 'asf': 'bi-file-play', 'rm': 'bi-file-play',
+            'rmvb': 'bi-file-play', 'vob': 'bi-file-play', 'ts': 'bi-file-play', 'mts': 'bi-file-play',
+            'm2ts': 'bi-file-play', 'divx': 'bi-file-play', 'xvid': 'bi-file-play', 'mpeg': 'bi-file-play',
+            'mpg': 'bi-file-play', 'mpe': 'bi-file-play', 'f4v': 'bi-file-play', 'mxf': 'bi-file-play',
+
+            // 字体文件
+            'ttf': 'bi-file-font', 'otf': 'bi-file-font', 'woff': 'bi-file-font', 'woff2': 'bi-file-font',
+            'eot': 'bi-file-font', 'pfb': 'bi-file-font', 'pfm': 'bi-file-font', 'afm': 'bi-file-font',
+            'fon': 'bi-file-font', 'fnt': 'bi-file-font',
+
+            // 设计文件
+            'psd': 'bi-file-image', 'ai': 'bi-file-image', 'eps': 'bi-file-image', 'svg': 'bi-file-image',
+            'sketch': 'bi-file-image', 'fig': 'bi-file-image', 'xd': 'bi-file-image', 'indd': 'bi-file-text',
+            'cdr': 'bi-file-image', 'dwg': 'bi-file-image', 'dxf': 'bi-file-image', '3dm': 'bi-file-image',
+            'blend': 'bi-file-image', 'max': 'bi-file-image', 'maya': 'bi-file-image', 'obj': 'bi-file-image',
+
+            // 开发相关
+            'patch': 'bi-file-code', 'diff': 'bi-file-code', 'rej': 'bi-file-code',
+            'po': 'bi-file-text', 'pot': 'bi-file-text', 'mo': 'bi-file-binary',
+            'pem': 'bi-file-code', 'key': 'bi-file-code', 'crt': 'bi-file-code', 'cer': 'bi-file-code',
+            'csr': 'bi-file-code', 'p12': 'bi-file-code', 'pfx': 'bi-file-code',
+
+            // 可执行文件
+            'exe': 'bi-file-binary', 'msi': 'bi-file-binary', 'app': 'bi-file-binary',
+            'deb': 'bi-file-binary', 'rpm': 'bi-file-binary', 'dmg': 'bi-file-binary',
+            'pkg': 'bi-file-binary', 'snap': 'bi-file-binary', 'flatpak': 'bi-file-binary',
+
+            // 备份文件
+            'bak': 'bi-file-earmark', 'backup': 'bi-file-earmark', 'old': 'bi-file-earmark',
+            'tmp': 'bi-file-earmark', 'temp': 'bi-file-earmark', 'swp': 'bi-file-earmark',
+            'swo': 'bi-file-earmark', 'lock': 'bi-file-lock', 'lck': 'bi-file-lock',
+
+            // 系统文件
+            'sys': 'bi-file-binary', 'dll': 'bi-file-binary', 'so': 'bi-file-binary',
+            'dylib': 'bi-file-binary', 'framework': 'bi-file-binary', 'kext': 'bi-file-binary',
+
+            // 其他常见文件
+            'torrent': 'bi-file-download', 'magnet': 'bi-file-download',
+            'iso': 'bi-file-cd', 'cue': 'bi-file-cd', 'bin': 'bi-file-binary',
+            'dat': 'bi-file-binary', 'dbf': 'bi-database', 'db': 'bi-database'
+        };
+        return icons[ext] || 'bi-file-earmark';
+    }
+
+    // 关闭预览模态框
+    function closePreviewModal() {
+        document.getElementById('preview-modal').style.display = 'none';
+    }
+
+    // 单个文件操作
+    function downloadSelectedFile() {
+        if (selectedFile) {
+            const url = `/api/servers/${currentServerId}/download?bucket=${currentBucket}&key=${encodeURIComponent(selectedFile)}`;
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = selectedFile.split('/').pop();
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
+    }
+
+    function deleteSelectedFile() {
+        if (selectedFile) {
+            if (confirm(`确定要删除文件 "${selectedFile.split('/').pop()}" 吗？`)) {
+                fetch(`/api/servers/${currentServerId}/delete`, {
+                    method: 'DELETE',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        bucket: currentBucket,
+                        keys: [selectedFile]
+                    })
+                })
+                .then(response => response.json())
+                .then(data => {
+                    if (data.error) {
+                        throw new Error(data.error);
+                    }
+                    selectedFile = null;
+                    document.getElementById('file-properties').style.display = 'none';
+                    loadFiles();
+                    updateStatus('删除成功', 'ready');
+                })
+                .catch(error => {
+                    console.error('删除失败:', error);
+                    alert('删除失败: ' + error.message);
+                });
+            }
+        }
+    }
+
+    // 多选功能函数
+    function toggleFileSelection(key, element) {
+        if (selectedItems.has(key)) {
+            selectedItems.delete(key);
+            element.classList.remove('multi-selected');
+        } else {
+            selectedItems.add(key);
+            element.classList.add('multi-selected');
+        }
+        updateSelectionCounter();
+        updateContextMenuState();
+
+        // 根据选中项数量显示对应面板
+        if (selectedItems.size > 0) {
+            showMultiSelectionActions();
+        } else {
+            // 没有选中项时隐藏面板
+            document.getElementById('file-properties').style.display = 'none';
+        }
+    }
+
+    // 显示多选操作面板
+    function showMultiSelectionActions() {
+        // 显示右侧面板
+        document.getElementById('file-properties').style.display = 'block';
+
+        // 清除预览状态
+        document.querySelectorAll('.previewing').forEach(el => {
+            el.classList.remove('previewing');
+        });
+
+        // 显示多选面板，隐藏单文件面板
+        document.getElementById('single-file-panel').style.display = 'none';
+        document.getElementById('multi-selection-panel').style.display = 'block';
+
+        updateMultiSelectionInfo();
+    }
+
+    // 隐藏多选操作面板
+    function hideMultiSelectionActions() {
+        document.getElementById('single-file-panel').style.display = 'block';
+        document.getElementById('multi-selection-panel').style.display = 'none';
+    }
+
+    // 更新多选信息
+    function updateMultiSelectionInfo() {
+        const count = selectedItems.size;
+        document.getElementById('multi-selection-count').textContent = `${count} 个项目`;
+
+        // 计算总大小
+        let totalSize = 0;
+        const filesList = document.getElementById('selected-files-list');
+        let listHTML = '';
+
+        selectedItems.forEach(key => {
+            const fileObj = getCurrentFileObjects().find(obj => obj.key === key);
+            if (fileObj) {
+                // 解析文件大小字符串并转换为字节
+                const sizeStr = fileObj.size || '0 B';
+                const sizeInBytes = parseFileSize(sizeStr);
+                totalSize += sizeInBytes;
+
+                listHTML += `
+                    <div style="padding: 4px 0; border-bottom: 1px solid var(--finder-border);">
+                        <div style="font-weight: 500;">${fileObj.name}</div>
+                        <div style="color: var(--finder-text-secondary); font-size: 11px;">
+                            ${fileObj.size || '0 B'} ${fileObj.type === 'folder' ? '(文件夹)' : ''}
+                        </div>
+                    </div>
+                `;
+            }
+        });
+
+        document.getElementById('multi-selection-size').textContent = formatFileSize(totalSize);
+        document.getElementById('selected-files-list').innerHTML = listHTML || '<div style="color: var(--finder-text-secondary);">暂无选中项目</div>';
+    }
+
+    // 解析文件大小字符串为字节数
+    function parseFileSize(sizeStr) {
+        const match = sizeStr.match(/^([\d.]+)\s*(B|KB|MB|GB|TB)$/i);
+        if (!match) return 0;
+
+        const value = parseFloat(match[1]);
+        const unit = match[2].toUpperCase();
+
+        const units = {
+            'B': 1,
+            'KB': 1024,
+            'MB': 1024 * 1024,
+            'GB': 1024 * 1024 * 1024,
+            'TB': 1024 * 1024 * 1024 * 1024
+        };
+
+        return value * (units[unit] || 1);
+    }
+
+    function updateSelectionCounter() {
+        const counter = document.getElementById('selection-counter');
+        const count = document.getElementById('selected-count');
+
+        if (selectedItems.size > 0) {
+            count.textContent = selectedItems.size;
+            counter.classList.add('show');
+        } else {
+            counter.classList.remove('show');
+        }
+    }
+
+    function clearSelection() {
+        selectedItems.clear();
+        tempSelectedItems.clear();
+        selectedFile = null;
+
+        // 清除所有选择和预览状态
+        document.querySelectorAll('.multi-selected, .temp-selected, .previewing').forEach(el => {
+            el.classList.remove('multi-selected', 'temp-selected', 'previewing');
+        });
+
+        updateSelectionCounter();
+    }
+
+    function clearTempSelection() {
+        tempSelectedItems.clear();
+        document.querySelectorAll('.temp-selected').forEach(el => {
+            el.classList.remove('temp-selected');
+        });
+    }
+
+    // 拖拽选择功能
+    function setupDragSelection() {
+        const filesContainer = document.getElementById('finder-files');
+
+        filesContainer.addEventListener('mousedown', function(e) {
+            // 只在左键点击且不在文件项上时开始拖拽选择
+            if (e.button === 0 && !e.target.closest('.file-item, .file-row')) {
+                // 清除预览状态
+                clearPreviewState();
+                startDragSelection(e);
+            }
+        });
+
+        // 点击空白区域时清除预览状态
+        filesContainer.addEventListener('click', function(e) {
+            if (e.target === filesContainer) {
+                clearPreviewState();
+            }
+        });
+    }
+
+    function startDragSelection(e) {
+        isSelecting = true;
+        selectionStartX = e.pageX;
+        selectionStartY = e.pageY;
+
+        const filesContainer = document.getElementById('finder-files');
+        filesContainer.classList.add('selecting');
+
+        // 创建选择框
+        selectionBox = document.createElement('div');
+        selectionBox.className = 'selection-box';
+        selectionBox.style.left = selectionStartX + 'px';
+        selectionBox.style.top = selectionStartY + 'px';
+        selectionBox.style.width = '0px';
+        selectionBox.style.height = '0px';
+        document.body.appendChild(selectionBox);
+
+        // 清除之前的选择和预览状态
+        selectedItems.clear();
+        clearPreviewState();
+        document.querySelectorAll('.multi-selected').forEach(el => {
+            el.classList.remove('multi-selected');
+        });
+        tempSelectedItems.clear();
+        document.querySelectorAll('.temp-selected').forEach(el => {
+            el.classList.remove('temp-selected');
+        });
+
+        document.addEventListener('mousemove', handleDragSelection);
+        document.addEventListener('mouseup', endDragSelection);
+
+        e.preventDefault();
+    }
+
+    function cancelDragSelection() {
+        if (isSelecting) {
+            isSelecting = false;
+
+            const filesContainer = document.getElementById('finder-files');
+            filesContainer.classList.remove('selecting');
+
+            if (selectionBox) {
+                selectionBox.remove();
+                selectionBox = null;
+            }
+
+            // 清除临时选择
+            clearTempSelection();
+
+            document.removeEventListener('mousemove', handleDragSelection);
+            document.removeEventListener('mouseup', endDragSelection);
+        }
+    }
+
+    function handleDragSelection(e) {
+        if (!isSelecting) return;
+
+        const currentX = e.pageX;
+        const currentY = e.pageY;
+
+        const left = Math.min(selectionStartX, currentX);
+        const top = Math.min(selectionStartY, currentY);
+        const width = Math.abs(currentX - selectionStartX);
+        const height = Math.abs(currentY - selectionStartY);
+
+        selectionBox.style.left = left + 'px';
+        selectionBox.style.top = top + 'px';
+        selectionBox.style.width = width + 'px';
+        selectionBox.style.height = height + 'px';
+
+        // 选择在选择框内的文件
+        selectItemsInBox(left, top, width, height);
+    }
+
+    function endDragSelection() {
+        isSelecting = false;
+
+        const filesContainer = document.getElementById('finder-files');
+        filesContainer.classList.remove('selecting');
+
+        if (selectionBox) {
+            selectionBox.remove();
+            selectionBox = null;
+        }
+
+        // 将临时选择转换为正式选择
+        tempSelectedItems.forEach(key => {
+            if (!selectedItems.has(key)) {
+                selectedItems.add(key);
+            }
+        });
+
+        // 更新所有临时选择的项目为正式选择
+        document.querySelectorAll('.temp-selected').forEach(item => {
+            item.classList.remove('temp-selected');
+            item.classList.add('multi-selected');
+        });
+
+        // 清除临时选择集合
+        tempSelectedItems.clear();
+
+        // 更新计数器和菜单状态
+        updateSelectionCounter();
+        updateContextMenuState();
+
+        document.removeEventListener('mousemove', handleDragSelection);
+        document.removeEventListener('mouseup', endDragSelection);
+    }
+
+    function selectItemsInBox(boxLeft, boxTop, boxWidth, boxHeight) {
+        const filesContainer = document.getElementById('finder-files');
+        const fileItems = filesContainer.querySelectorAll('.file-item, .file-row');
+        const boxRight = boxLeft + boxWidth;
+        const boxBottom = boxTop + boxHeight;
+
+        // 清除之前的临时选择
+        clearTempSelection();
+
+        fileItems.forEach(item => {
+            const rect = item.getBoundingClientRect();
+            const itemLeft = rect.left + window.scrollX;
+            const itemRight = rect.right + window.scrollX;
+            const itemTop = rect.top + window.scrollY;
+            const itemBottom = rect.bottom + window.scrollY;
+
+            // 检查文件项是否与选择框相交
+            if (!(itemRight < boxLeft || itemLeft > boxRight ||
+                  itemBottom < boxTop || itemTop > boxBottom)) {
+                const key = item.getAttribute('data-key');
+                if (key) {
+                    tempSelectedItems.add(key);
+                    item.classList.add('temp-selected');
+                }
+            }
+        });
+    }
+
+    // 修改handleFileClick函数以支持多选
+    function handleFileClickNew(key, type, element, event) {
+        event.stopPropagation();
+
+        // 先清除预览状态（除非点击的是当前预览的文件）
+        if (selectedFile !== key) {
+            clearPreviewState();
+        }
+
+        if (event.ctrlKey || event.metaKey) {
+            // Ctrl/Cmd + 点击：切换选择
+            toggleFileSelection(key, element);
+        } else if (event.shiftKey && selectedItems.size > 0) {
+            // Shift + 点击：范围选择
+            // TODO: 实现范围选择逻辑
+        } else {
+            // 普通点击：显示文件预览
+            showFilePreview(key, element);
+        }
+    }
+
+    // 代码高亮功能
+    function getCodeHighlighting(content, filename) {
+        const extension = filename.split('.').pop().toLowerCase();
+        let language = '';
+
+        // 映射文件扩展名到highlight.js语言名称
+        const languageMap = {
+            // Web技术
+            'js': 'javascript',
+            'jsx': 'jsx',
+            'ts': 'typescript',
+            'tsx': 'tsx',
+            'html': 'html',
+            'htm': 'html',
+            'css': 'css',
+            'scss': 'scss',
+            'sass': 'sass',
+            'less': 'less',
+            'vue': 'vue',
+            'svelte': 'svelte',
+
+            // 编程语言
+            'py': 'python',
+            'java': 'java',
+            'cpp': 'cpp',
+            'c': 'c',
+            'cs': 'csharp',
+            'php': 'php',
+            'rb': 'ruby',
+            'go': 'go',
+            'rs': 'rust',
+            'swift': 'swift',
+            'kt': 'kotlin',
+            'scala': 'scala',
+            'r': 'r',
+
+            // 数据和配置
+            'json': 'json',
+            'xml': 'xml',
+            'yaml': 'yaml',
+            'yml': 'yaml',
+            'toml': 'toml',
+            'ini': 'ini',
+            'sql': 'sql',
+            'sh': 'bash',
+            'bash': 'bash',
+            'zsh': 'bash',
+            'fish': 'fish',
+
+            // 其他
+            'md': 'markdown',
+            'markdown': 'markdown',
+            'dockerfile': 'dockerfile',
+            'gitignore': 'ignore',
+            'log': 'plaintext'
+        };
+
+        language = languageMap[extension] || 'plaintext';
+
+        // 转义HTML字符
+        const escapedContent = content
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+
+        // 如果highlight.js可用，使用它进行高亮
+        if (typeof hljs !== 'undefined') {
+            const result = hljs.highlight(escapedContent, { language: language });
+            return `<pre><code class="hljs language-${language}" style="margin: 0; padding: 16px; border-radius: 8px; font-family: 'Monaco', 'Menlo', 'SF Mono', monospace; font-size: 12px; line-height: 1.5; overflow-x: auto;">${result.value}</code></pre>`;
+        } else {
+            // 降级到简单的代码块
+            return `<pre style="margin: 0; padding: 16px; border-radius: 8px; font-family: 'Monaco', 'Menlo', 'SF Mono', monospace; font-size: 12px; line-height: 1.5; overflow-x: auto; background: #f6f8fa;">${escapedContent}</pre>`;
+        }
+    }
+
+    // 全局拖拽上传功能
+    function setupGlobalDragUpload() {
+        const dropZone = document.getElementById('global-drop-zone');
+
+        // 防止默认的拖拽行为
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+            document.addEventListener(eventName, preventDefaults, false);
+        });
+
+        // 添加拖拽进入/离开的视觉效果
+        ['dragenter', 'dragover'].forEach(eventName => {
+            document.addEventListener(eventName, highlight, false);
+        });
+
+        ['dragleave', 'drop'].forEach(eventName => {
+            document.addEventListener(eventName, unhighlight, false);
+        });
+
+        // 处理文件拖拽
+        document.addEventListener('drop', handleDrop, false);
+    }
+
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+
+    function highlight(e) {
+        if (!currentServerId || !currentBucket) return;
+
+        isDragOver = true;
+        const dropZone = document.getElementById('global-drop-zone');
+        dropZone.style.display = 'flex';
+
+        // 添加拖拽样式到body
+        document.body.classList.add('drag-over');
+    }
+
+    function unhighlight(e) {
+        isDragOver = false;
+        const dropZone = document.getElementById('global-drop-zone');
+        dropZone.style.display = 'none';
+
+        // 移除拖拽样式
+        document.body.classList.remove('drag-over');
+    }
+
+    function handleDrop(e) {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+
+        if (!currentServerId || !currentBucket) {
+            showNotification('请先选择服务器和存储桶', 'error');
+            return;
+        }
+
+        if (files.length > 0) {
+            dragUploadFiles = Array.from(files);
+            showDragUploadFiles();
+        }
+    }
+
+    function showDragUploadFiles() {
+        const fileList = document.getElementById('drop-zone-file-list');
+        const dropZone = document.getElementById('global-drop-zone');
+
+        let html = '<div class="file-list-header">准备上传的文件:</div>';
+        let totalSize = 0;
+
+        dragUploadFiles.forEach((file, index) => {
+            totalSize += file.size;
+            html += `
+                <div class="drop-file-item">
+                    <div class="file-info">
+                        <i class="bi bi-file-earmark"></i>
+                        <span class="file-name">${file.name}</span>
+                    </div>
+                    <span class="file-size">${formatFileSize(file.size)}</span>
+                </div>
+            `;
+        });
+
+        html += `<div class="total-size">总大小: ${formatFileSize(totalSize)}</div>`;
+        fileList.innerHTML = html;
+        dropZone.style.display = 'flex';
+    }
+
+    function cancelDragUpload() {
+        dragUploadFiles = [];
+        document.getElementById('global-drop-zone').style.display = 'none';
+        document.getElementById('drop-zone-file-list').innerHTML = '';
+    }
+
+    function confirmDragUpload() {
+        if (dragUploadFiles.length === 0) {
+            cancelDragUpload();
+            return;
+        }
+
+        // 隐藏拖拽区域，显示进度
+        document.getElementById('global-drop-zone').style.display = 'none';
+        document.getElementById('drag-upload-progress').style.display = 'flex';
+
+        // 开始上传
+        uploadDragFiles();
+    }
+
+    function uploadDragFiles() {
+        const totalFiles = dragUploadFiles.length;
+        let uploadedCount = 0;
+        let hasErrors = false;
+
+        const updateProgress = () => {
+            const progress = Math.round((uploadedCount / totalFiles) * 100);
+            document.getElementById('upload-progress-bar').style.width = progress + '%';
+            document.getElementById('upload-status-text').textContent =
+                `正在上传 ${uploadedCount}/${totalFiles} 个文件...`;
+        };
+
+        const uploadPromises = dragUploadFiles.map(file => {
+            const formData = new FormData();
+            formData.append('file', file);
+            formData.append('bucket', currentBucket);
+            formData.append('prefix', currentPrefix || '');
+
+            return fetch(`/api/servers/${currentServerId}/upload`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                uploadedCount++;
+                updateProgress();
+
+                if (data.error) {
+                    hasErrors = true;
+                    console.error(`上传 ${file.name} 失败:`, data.error);
+                }
+
+                return data;
+            })
+            .catch(error => {
+                uploadedCount++;
+                updateProgress();
+                hasErrors = true;
+                console.error(`上传 ${file.name} 失败:`, error);
+                return { error: error.message };
+            });
+        });
+
+        Promise.all(uploadPromises).then(results => {
+            // 隐藏进度提示
+            setTimeout(() => {
+                document.getElementById('drag-upload-progress').style.display = 'none';
+
+                if (hasErrors) {
+                    const errorCount = results.filter(r => r.error).length;
+                    showNotification(`上传完成，但有 ${errorCount} 个文件失败`, 'warning');
+                } else {
+                    showNotification(`成功上传 ${totalFiles} 个文件`, 'success');
+                }
+
+                // 刷新文件列表
+                loadFiles();
+
+                // 清空拖拽文件列表
+                dragUploadFiles = [];
+                document.getElementById('upload-progress-bar').style.width = '0%';
+                document.getElementById('upload-status-text').textContent = '准备上传...';
+            }, 1000);
+        });
+    }
+
+    function showNotification(message, type = 'info') {
+        // 创建通知元素
+        const notification = document.createElement('div');
+        notification.className = `notification notification-${type}`;
+        notification.innerHTML = `
+            <div class="notification-content">
+                <i class="bi bi-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+                <span>${message}</span>
+            </div>
+        `;
+
+        // 添加到页面
+        document.body.appendChild(notification);
+
+        // 显示动画
+        setTimeout(() => {
+            notification.classList.add('show');
+        }, 100);
+
+        // 自动隐藏
+        setTimeout(() => {
+            notification.classList.remove('show');
+            setTimeout(() => {
+                document.body.removeChild(notification);
+            }, 300);
+        }, 3000);
+    }
+
+    // 初始化多选和拖拽功能
+    document.addEventListener('DOMContentLoaded', function() {
+        setupDragSelection();
+        setupGlobalDragUpload();
+
+        // 添加ESC键支持来取消操作
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                if (isSelecting) {
+                    cancelDragSelection();
+                } else if (isDragOver) {
+                    cancelDragUpload();
+                }
+            }
+        });
+
+        // 添加全局点击事件来清除预览状态
+        document.addEventListener('click', function(e) {
+            // 检查点击是否在文件区域外
+            const filesContainer = document.getElementById('finder-files');
+            const fileProperties = document.getElementById('file-properties');
+
+            if (!filesContainer.contains(e.target) && !fileProperties.contains(e.target)) {
+                // 点击在文件区域和属性面板外部，清除预览状态
+                clearPreviewState();
+            }
+        });
+    });
+</script>
+{% endblock %}

@@ -1,0 +1,20 @@
+{
+  "servers": [
+    {
+      "id": 1,
+      "name": "wiki",
+      "access_key": "wiki",
+      "secret_key": "jG679322",
+      "endpoint_url": "https://minio.ukey.pw",
+      "region": "auto"
+    },
+    {
+      "id": 2,
+      "name": "CF",
+      "access_key": "b633f6f8921fff64173ddda837b54326",
+      "secret_key": "d78bac83cad90f73cfaca57b1e1e364e7d4f72008703edfd37577ca972cef6cf",
+      "endpoint_url": "https://d6351223f25a973eb4483061717a5ab5.r2.cloudflarestorage.com",
+      "region": "auto"
+    }
+  ]
+}

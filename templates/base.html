@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}S3 Finder{% endblock %}</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.0/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/styles/github.min.css" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/finder.css') }}" rel="stylesheet">
+</head>
+<body>
+    {% block content %}{% endblock %}
+
+    <!-- 模态框容器 -->
+    <div id="modal-container"></div>
+
+    <!-- 右键菜单 -->
+    <div id="context-menu" class="context-menu">
+        <div class="context-menu-item" onclick="refreshFiles()">
+            <i class="bi bi-arrow-clockwise"></i> 刷新
+        </div>
+        <div class="context-menu-item" onclick="showUploadModal()">
+            <i class="bi bi-cloud-upload"></i> 上传文件
+        </div>
+        <div class="context-menu-item" onclick="createFolder()">
+            <i class="bi bi-folder-plus"></i> 新建文件夹
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" onclick="downloadSelected()" id="download-item" style="display: none;">
+            <i class="bi bi-cloud-download"></i> 下载
+        </div>
+        <div class="context-menu-item" onclick="deleteSelected()" id="delete-item" style="display: none;">
+            <i class="bi bi-trash"></i> 删除
+        </div>
+        <div class="context-menu-divider"></div>
+        <div class="context-menu-item" onclick="showSettingsModal()">
+            <i class="bi bi-gear"></i> 设置
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/highlight.js@11.9.0/lib/highlight.min.js"></script>
+    <script>
+        // 全局变量
+        let currentServerId = null;
+        let currentBucket = null;
+        let currentPrefix = '';
+        let selectedFiles = new Set();
+        let selectedFile = null; // 当前选中的单个文件
+        let multiSelectMode = false;
+        let viewMode = 'grid'; // grid 或 list
+
+        // 工具函数
+        function formatFileSize(bytes) {
+            if (bytes === 0) return '0 B';
+            const k = 1024;
+            const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+            const i = Math.floor(Math.log(bytes) / Math.log(k));
+            return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+        }
+
+        function showLoading() {
+            document.getElementById('finder-files').innerHTML = `
+                <div class="loading">
+                    <div class="spinner"></div>
+                </div>
+            `;
+        }
+
+        function hideContextMenu() {
+            document.getElementById('context-menu').style.display = 'none';
+        }
+
+        // 文件选择
+        function toggleFileSelection(key, element) {
+            if (selectedFiles.has(key)) {
+                selectedFiles.delete(key);
+                element.classList.remove('selected');
+            } else {
+                selectedFiles.add(key);
+                element.classList.add('selected');
+            }
+            updateContextMenuState();
+        }
+
+        function updateContextMenuState() {
+            const downloadItem = document.getElementById('download-item');
+            const deleteItem = document.getElementById('delete-item');
+
+            if (selectedFiles.size > 0) {
+                downloadItem.style.display = 'flex';
+                deleteItem.style.display = 'flex';
+            } else {
+                downloadItem.style.display = 'none';
+                deleteItem.style.display = 'none';
+            }
+        }
+
+        // 右键菜单
+        document.addEventListener('contextmenu', function(e) {
+            e.preventDefault();
+            const contextMenu = document.getElementById('context-menu');
+            contextMenu.style.left = e.pageX + 'px';
+            contextMenu.style.top = e.pageY + 'px';
+            contextMenu.style.display = 'block';
+        });
+
+        document.addEventListener('click', hideContextMenu);
+
+        // 键盘快捷键
+        document.addEventListener('keydown', function(e) {
+            if (e.key === 'Escape') {
+                hideContextMenu();
+                // 关闭预览模态框
+                const previewModal = document.getElementById('preview-modal');
+                if (previewModal && previewModal.style.display === 'flex') {
+                    previewModal.style.display = 'none';
+                }
+                selectedFiles.clear();
+                document.querySelectorAll('.file-item.selected, .file-row.selected').forEach(el => {
+                    el.classList.remove('selected');
+                });
+                updateContextMenuState();
+            } else if (e.key === 'Delete' && selectedFiles.size > 0) {
+                deleteSelected();
+            } else if (e.ctrlKey && e.key === 'a') {
+                e.preventDefault();
+                selectAllFiles();
+            }
+        });
+
+        // 拖拽上传
+        function setupDragAndDrop() {
+            const dropZone = document.body;
+
+            dropZone.addEventListener('dragover', function(e) {
+                e.preventDefault();
+                dropZone.classList.add('dragover');
+            });
+
+            dropZone.addEventListener('dragleave', function(e) {
+                if (e.target === dropZone) {
+                    dropZone.classList.remove('dragover');
+                }
+            });
+
+            dropZone.addEventListener('drop', function(e) {
+                e.preventDefault();
+                dropZone.classList.remove('dragover');
+
+                const files = Array.from(e.dataTransfer.files);
+                if (files.length > 0 && currentServerId && currentBucket) {
+                    uploadFiles(files);
+                }
+            });
+        }
+
+        // 视图切换
+        function toggleView() {
+            viewMode = viewMode === 'grid' ? 'list' : 'grid';
+            document.getElementById('view-toggle').innerHTML = viewMode === 'grid' ?
+                '<i class="bi bi-list"></i>' : '<i class="bi bi-grid"></i>';
+            if (currentServerId && currentBucket) {
+                loadFiles();
+            }
+        }
+
+        // 页面加载完成后初始化
+        document.addEventListener('DOMContentLoaded', function() {
+            setupDragAndDrop();
+            checkFirstRun();
+        });
+
+        // 首次运行检查
+        function checkFirstRun() {
+            fetch('/api/servers')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.servers.length === 0) {
+                        showSettingsModal();
+                    } else {
+                        loadServers();
+                    }
+                });
+        }
+
+        // 占位函数 - 将被具体页面覆盖
+        function loadServers() {}
+        function loadFiles() {}
+        function refreshFiles() {}
+        function showUploadModal() {}
+        function createFolder() {}
+        function downloadSelected() {}
+        function deleteSelected() {}
+        function showSettingsModal() {}
+        function uploadFiles(files) {}
+        function selectAllFiles() {}
+    </script>
+    {% block scripts %}{% endblock %}
+</body>
+</html>
