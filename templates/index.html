@@ -63,6 +63,10 @@
                 <span class="icon"><i class="bi bi-cloud-upload"></i></span>
                 上传文件
             </a>
+            <a href="#" class="sidebar-item" onclick="showUploads()">
+                <span class="icon"><i class="bi bi-cloud-upload"></i></span>
+                上传管理
+            </a>
             <a href="#" class="sidebar-item" onclick="showDownloads()">
                 <span class="icon"><i class="bi bi-download"></i></span>
                 下载管理
@@ -107,10 +111,93 @@
                 </div>
             </div>
 
+            <!-- 上传管理区域 -->
+            <div class="upload-management-panel" id="upload-management-panel" style="width: 350px; border-left: 1px solid var(--finder-border); display: none;">
+                <div class="upload-panel-header">
+                    <h3>上传管理</h3>
+                    <button class="btn btn-sm btn-secondary" onclick="toggleUploadPanel()">
+                        <i class="bi bi-x"></i>
+                    </button>
+                </div>
+                <div class="upload-panel-controls">
+                    <button class="btn btn-primary btn-sm" onclick="clearCompletedUploads()" style="width: 100%; font-size: 12px; padding: 6px 8px;">清除已完成</button>
+                    <button class="btn btn-secondary btn-sm" onclick="cancelAllUploads()" style="width: 100%; font-size: 12px; padding: 6px 8px;">取消全部</button>
+                </div>
+                <div id="upload-panel-stats" class="upload-panel-stats">
+                    <span id="upload-stats">0 个进行中</span>
+                </div>
+                <div id="upload-list" class="upload-panel-list">
+                    <!-- 上传项目将在这里显示 -->
+                    <div class="empty-state">
+                        <i class="bi bi-cloud-upload" style="font-size: 24px; color: var(--finder-text-secondary);"></i>
+                        <p style="color: var(--finder-text-secondary); margin-top: 8px; font-size: 12px;">暂无上传任务</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- 文件属性面板 -->
-            <div class="file-properties" id="file-properties" style="display: none; width: 300px; border-left: 1px solid var(--finder-border);">
+            <div class="file-properties" id="file-properties" style="display: block; width: 300px; border-left: 1px solid var(--finder-border);">
+                <!-- 欢迎面板 -->
+                <div id="welcome-panel" style="display: block;">
+                    <div class="properties-section">
+                        <div class="properties-title">S3 Finder</div>
+                        <div class="properties-item">
+                            <span class="properties-value" style="text-align: center; display: block; padding: 20px 0;">
+                                <i class="bi bi-cloud" style="font-size: 32px; color: var(--finder-text-secondary); display: block; margin-bottom: 10px;"></i>
+                                <span style="color: var(--finder-text-secondary); font-size: 14px;">macOS风格的S3客户端</span>
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 容器信息面板 -->
+                <div id="container-info-panel" style="display: none;">
+                    <div class="properties-section">
+                        <div class="properties-title" id="container-title">存储桶</div>
+                        <div class="properties-item">
+                            <span class="properties-label">名称</span>
+                            <span class="properties-value" id="container-name">-</span>
+                        </div>
+                        <div class="properties-item">
+                            <span class="properties-label">类型</span>
+                            <span class="properties-value" id="container-type">-</span>
+                        </div>
+                        <div class="properties-item">
+                            <span class="properties-label">路径</span>
+                            <span class="properties-value" id="container-path" style="font-size: 12px; word-break: break-all;">/</span>
+                        </div>
+                        <div class="properties-item">
+                            <span class="properties-label">项目数量</span>
+                            <span class="properties-value" id="container-count">-</span>
+                        </div>
+                        <div class="properties-item">
+                            <span class="properties-label">CDN状态</span>
+                            <span class="properties-value" id="container-cdn-status">
+                                <span id="cdn-status-text">未配置</span>
+                                <button class="btn btn-xs btn-secondary" onclick="showBucketCdnConfig()" style="margin-left: 8px; padding: 2px 6px; font-size: 10px;">
+                                    <i class="bi bi-gear"></i> 配置
+                                </button>
+                            </span>
+                        </div>
+                    </div>
+                    <div class="properties-section">
+                        <div class="properties-title">操作</div>
+                        <div class="preview-actions">
+                            <button class="btn btn-primary btn-sm" onclick="showUploadModal()">
+                                <i class="bi bi-cloud-upload"></i> 上传文件
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="createFolder()">
+                                <i class="bi bi-folder-plus"></i> 新建文件夹
+                            </button>
+                            <button class="btn btn-secondary btn-sm" onclick="showBucketCdnConfig()">
+                                <i class="bi bi-speedometer2"></i> CDN配置
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <!-- 单个文件信息面板 -->
-                <div id="single-file-panel">
+                <div id="single-file-panel" style="display: none;">
                     <div class="properties-section">
                         <div class="properties-title">文件信息</div>
                         <div class="properties-item">
@@ -258,6 +345,77 @@
         <div class="modal-footer">
             <button class="btn btn-secondary" onclick="closeModal('add-server-modal')">取消</button>
             <button class="btn btn-primary" onclick="addServer()">添加</button>
+        </div>
+    </div>
+</div>
+
+<!-- 编辑服务器模态框 -->
+<div class="modal" id="edit-server-modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">编辑S3服务器</h3>
+            <button class="modal-close" onclick="closeModal('edit-server-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="edit-server-form">
+                <input type="hidden" name="server_id">
+                <div class="form-group">
+                    <label class="form-label">服务器名称</label>
+                    <input type="text" class="form-input" name="name" required placeholder="例如: 阿里云OSS">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Access Key ID</label>
+                    <input type="text" class="form-input" name="access_key" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Access Key Secret</label>
+                    <input type="password" class="form-input" name="secret_key" required>
+                </div>
+                <div class="form-group">
+                    <label class="form-label">Endpoint URL</label>
+                    <input type="url" class="form-input" name="endpoint_url" required placeholder="https://oss-cn-beijing.aliyuncs.com">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">区域</label>
+                    <input type="text" class="form-input" name="region" placeholder="oss-cn-beijing">
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('edit-server-modal')">取消</button>
+            <button class="btn btn-primary" onclick="updateServer()">保存</button>
+        </div>
+    </div>
+</div>
+
+<!-- 桶CDN配置模态框 -->
+<div class="modal" id="bucket-cdn-modal" style="display: none;">
+    <div class="modal-content">
+        <div class="modal-header">
+            <h3 class="modal-title">桶CDN配置</h3>
+            <button class="modal-close" onclick="closeModal('bucket-cdn-modal')">&times;</button>
+        </div>
+        <div class="modal-body">
+            <form id="bucket-cdn-form">
+                <input type="hidden" name="server_id">
+                <input type="hidden" name="bucket_name">
+                <div class="form-group">
+                    <label class="form-label">存储桶名称</label>
+                    <input type="text" class="form-input" name="bucket_display" readonly style="background-color: var(--finder-bg-secondary);">
+                </div>
+                <div class="form-group">
+                    <label class="form-label">CDN加速域名 <span style="color: var(--finder-text-secondary); font-size: 12px;">(可选)</span></label>
+                    <input type="url" class="form-input" name="cdn_url" placeholder="https://cdn.example.com">
+                    <div style="color: var(--finder-text-secondary); font-size: 12px; margin-top: 5px;">
+                        用于此桶文件预览和下载的CDN加速域名，留空则使用原始API地址
+                    </div>
+                </div>
+            </form>
+        </div>
+        <div class="modal-footer">
+            <button class="btn btn-secondary" onclick="closeModal('bucket-cdn-modal')">取消</button>
+            <button class="btn btn-danger" onclick="deleteBucketCdnConfig()" id="delete-cdn-btn" style="display: none;">删除CDN配置</button>
+            <button class="btn btn-primary" onclick="saveBucketCdnConfig()">保存</button>
         </div>
     </div>
 </div>
@@ -434,6 +592,9 @@
         document.getElementById('upload-btn').disabled = false;
         document.getElementById('folder-btn').disabled = false;
 
+        // 清除选择并显示欢迎面板
+        clearFileSelection();
+
         // 显示存储桶列表
         showBuckets(serverId);
         updateStatus(`正在连接到服务器...`, 'loading');
@@ -585,6 +746,7 @@
         currentPrefix = '';
         navigationHistory = [{'bucket': bucketName, 'prefix': ''}];
         navigationIndex = 0;
+        currentPage = 1; // 重置到第一页
 
         // 更新侧边栏选中状态
         document.querySelectorAll('#buckets-list .sidebar-item').forEach(item => {
@@ -596,10 +758,16 @@
 
         loadFiles();
         updateNavigationButtons();
+        saveCurrentState();
     }
 
+    // 翻页相关变量
+    let currentPage = 1;
+    let itemsPerPage = 100;
+    let currentPagination = null;
+
     // 加载文件列表
-    function loadFiles() {
+    function loadFiles(page = 1) {
         if (!currentServerId || !currentBucket) return;
 
         showLoading();
@@ -607,7 +775,9 @@
 
         const params = new URLSearchParams({
             bucket: currentBucket,
-            prefix: currentPrefix
+            prefix: currentPrefix,
+            page: page,
+            per_page: itemsPerPage
         });
 
         fetch(`/api/servers/${currentServerId}/objects?${params}`)
@@ -617,14 +787,115 @@
                     throw new Error(data.error);
                 }
 
+                currentPage = page;
+                currentPagination = data.pagination;
                 displayFiles(data.objects);
                 updatePathbar();
-                updateStatus(`显示 ${data.objects.length} 个项目`, 'ready');
+                displayPagination(data.pagination);
+                updateStatus(`显示第 ${page} 页，共 ${data.pagination.total} 个项目`, 'ready');
+
+                // 保存状态
+                saveCurrentState();
             })
             .catch(error => {
                 console.error('加载文件失败:', error);
                 updateStatus('加载文件失败: ' + error.message, 'error');
             });
+    }
+
+    // 显示翻页控件
+    function displayPagination(pagination) {
+        const filesContainer = document.getElementById('finder-files');
+        let paginationHtml = '';
+
+        if (pagination.total_pages > 1) {
+            paginationHtml = `
+                <div class="pagination-container" style="display: flex; justify-content: center; align-items: center; padding: 15px; background: var(--finder-bg-secondary); border-top: 1px solid var(--finder-border);">
+                    <div class="pagination-info" style="margin-right: 20px; color: var(--finder-text-secondary); font-size: 12px;">
+                        第 ${pagination.page} / ${pagination.total_pages} 页，共 ${pagination.total} 个项目
+                    </div>
+                    <div class="pagination-controls">
+                        ${pagination.has_prev ? `
+                            <button class="btn btn-sm btn-secondary" onclick="loadFiles(${pagination.page - 1})" style="margin-right: 5px;">
+                                <i class="bi bi-chevron-left"></i> 上一页
+                            </button>
+                        ` : ''}
+
+                        <span class="pagination-pages" style="margin: 0 10px;">
+                            ${generatePageNumbers(pagination)}
+                        </span>
+
+                        ${pagination.has_next ? `
+                            <button class="btn btn-sm btn-secondary" onclick="loadFiles(${pagination.page + 1})" style="margin-left: 5px;">
+                                下一页 <i class="bi bi-chevron-right"></i>
+                            </button>
+                        ` : ''}
+                    </div>
+                    <div class="pagination-per-page" style="margin-left: 20px;">
+                        <select class="form-select" onchange="changePerPage(this.value)" style="font-size: 12px; padding: 4px 8px;">
+                            <option value="50" ${itemsPerPage === 50 ? 'selected' : ''}>50条/页</option>
+                            <option value="100" ${itemsPerPage === 100 ? 'selected' : ''}>100条/页</option>
+                            <option value="200" ${itemsPerPage === 200 ? 'selected' : ''}>200条/页</option>
+                            <option value="500" ${itemsPerPage === 500 ? 'selected' : ''}>500条/页</option>
+                        </select>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 查找或创建翻页容器
+        let paginationContainer = document.querySelector('.pagination-container');
+        if (!paginationContainer) {
+            paginationContainer = document.createElement('div');
+            filesContainer.parentNode.insertBefore(paginationContainer, filesContainer.nextSibling);
+        }
+        paginationContainer.outerHTML = paginationHtml;
+    }
+
+    // 生成页码按钮
+    function generatePageNumbers(pagination) {
+        let html = '';
+        const currentPage = pagination.page;
+        const totalPages = pagination.total_pages;
+        const maxButtons = 5;
+
+        let startPage = Math.max(1, currentPage - Math.floor(maxButtons / 2));
+        let endPage = Math.min(totalPages, startPage + maxButtons - 1);
+
+        // 调整范围确保显示5个按钮
+        if (endPage - startPage + 1 < maxButtons) {
+            startPage = Math.max(1, endPage - maxButtons + 1);
+        }
+
+        // 第一页
+        if (startPage > 1) {
+            html += `<button class="btn btn-sm ${currentPage === 1 ? 'btn-primary' : 'btn-secondary'}" onclick="loadFiles(1)">1</button>`;
+            if (startPage > 2) {
+                html += `<span style="margin: 0 5px;">...</span>`;
+            }
+        }
+
+        // 中间页码
+        for (let i = startPage; i <= endPage; i++) {
+            html += `<button class="btn btn-sm ${i === currentPage ? 'btn-primary' : 'btn-secondary'}" onclick="loadFiles(${i})" style="margin: 0 2px;">${i}</button>`;
+        }
+
+        // 最后一页
+        if (endPage < totalPages) {
+            if (endPage < totalPages - 1) {
+                html += `<span style="margin: 0 5px;">...</span>`;
+            }
+            html += `<button class="btn btn-sm ${currentPage === totalPages ? 'btn-primary' : 'btn-secondary'}" onclick="loadFiles(${totalPages})">${totalPages}</button>`;
+        }
+
+        return html;
+    }
+
+    // 改变每页显示数量
+    function changePerPage(perPage) {
+        itemsPerPage = parseInt(perPage);
+        currentPage = 1;
+        loadFiles(1);
     }
 
     // 显示文件列表
@@ -643,8 +914,8 @@
                     <p>此文件夹为空</p>
                 </div>
             `;
-            // 隐藏属性面板
-            document.getElementById('file-properties').style.display = 'none';
+            // 显示容器信息面板
+            updateContainerInfo();
             return;
         }
 
@@ -655,6 +926,9 @@
         }
 
         document.getElementById('status-right').textContent = `${objects.length} 个项目`;
+
+        // 更新容器信息面板
+        updateContainerInfo();
     }
 
     // 双击文件处理
@@ -665,6 +939,9 @@
             navigationHistory = navigationHistory.slice(0, navigationIndex + 1);
             navigationHistory.push({'bucket': currentBucket, 'prefix': currentPrefix});
             navigationIndex++;
+
+            // 重置分页并加载文件
+            currentPage = 1;
             loadFiles();
             updateNavigationButtons();
         } else {
@@ -791,11 +1068,22 @@
 
     // 清除预览状态
     function clearPreviewState() {
-        // 清除所有预览状态
-        document.querySelectorAll('.previewing').forEach(el => {
-            el.classList.remove('previewing');
-        });
-        selectedFile = null;
+        // 停止所有正在播放的媒体
+        const previewContainer = document.getElementById('prop-preview');
+        const video = previewContainer.querySelector('#preview-video');
+        const audio = previewContainer.querySelector('#preview-audio');
+
+        if (video) {
+            video.pause();
+            video.currentTime = 0;
+        }
+        if (audio) {
+            audio.pause();
+            audio.currentTime = 0;
+        }
+
+        // 使用统一的清除选择函数
+        clearFileSelection();
     }
 
     // 显示文件预览（简介模式）
@@ -910,20 +1198,169 @@
                 const previewContainer = document.getElementById('prop-preview');
 
                 if (data.preview_type === 'pdf_embed') {
-                    // PDF预览 - 使用iframe
-                    previewContainer.innerHTML = `<iframe src="${data.preview_url}" style="width: 100%; height: 200px; border: 1px solid var(--finder-border); border-radius: 6px;" frameborder="0"></iframe>`;
+                    // PDF预览 - 使用iframe，优先使用CDN
+                    const pdfUrl = data.cdn_url || data.preview_url;
+                    previewContainer.innerHTML = `<iframe src="${pdfUrl}" style="width: 100%; height: 200px; border: 1px solid var(--finder-border); border-radius: 6px;" frameborder="0"></iframe>`;
+                } else if (data.preview_type === 'media_embed') {
+                    // 媒体文件预览 - 视频/音频
+                    const mediaUrl = data.cdn_url || data.preview_url;
+                    if (data.content_type.startsWith('video/')) {
+                        previewContainer.innerHTML = `
+                            <video controls style="width: 100%; max-height: 300px; border-radius: 6px;" preload="metadata" id="preview-video">
+                                <source src="${mediaUrl}" type="${data.content_type}">
+                                您的浏览器不支持视频播放。
+                            </video>
+                        `;
+                        // 确保预览面板关闭时停止视频播放和声音
+                        const video = previewContainer.querySelector('#preview-video');
+                        if (video) {
+                            // 监听面板关闭事件
+                            const observer = new MutationObserver((mutations) => {
+                                mutations.forEach((mutation) => {
+                                    if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                                        if (previewContainer.style.display === 'none') {
+                                            video.pause();
+                                            video.currentTime = 0;
+                                        }
+                                    }
+                                });
+                            });
+                            observer.observe(previewContainer, { attributes: true });
+                        }
+                    } else if (data.content_type.startsWith('audio/')) {
+                        previewContainer.innerHTML = `
+                            <audio controls style="width: 100%; border-radius: 6px;" preload="metadata" id="preview-audio">
+                                <source src="${mediaUrl}" type="${data.content_type}">
+                                您的浏览器不支持音频播放。
+                            </audio>
+                        `;
+                        // 确保预览面板关闭时停止音频播放
+                        const audio = previewContainer.querySelector('#preview-audio');
+                        if (audio) {
+                            const observer = new MutationObserver((mutations) => {
+                                mutations.forEach((mutation) => {
+                                    if (mutation.type === 'attributes' && mutation.attributeName === 'style') {
+                                        if (previewContainer.style.display === 'none') {
+                                            audio.pause();
+                                            audio.currentTime = 0;
+                                        }
+                                    }
+                                });
+                            });
+                            observer.observe(previewContainer, { attributes: true });
+                        }
+                    }
                 } else if (data.content_type.startsWith('image/')) {
-                    previewContainer.innerHTML = `<img src="${data.preview}" alt="${data.filename}" style="max-width: 100%; border-radius: 6px;">`;
+                    // 图片预览 - 优先使用CDN
+                    const imageUrl = data.cdn_url || data.preview;
+                    previewContainer.innerHTML = `<img src="${imageUrl}" alt="${data.filename}" style="max-width: 100%; border-radius: 6px;">`;
                 } else if (data.content_type.startsWith('text/') || data.content_type.includes('json') || data.content_type.includes('xml') || data.content_type.includes('javascript')) {
                     previewContainer.innerHTML = getCodeHighlighting(data.preview, data.filename);
                 } else {
                     previewContainer.innerHTML = `<div style="color: var(--finder-text-secondary); font-size: 12px;">${data.preview}</div>`;
+                }
+
+                // 显示CDN指示器
+                if (data.cdn_url) {
+                    const cdnIndicator = document.createElement('div');
+                    cdnIndicator.style.cssText = 'color: var(--finder-text-secondary); font-size: 10px; margin-top: 5px; text-align: right; padding: 4px 8px; background: var(--finder-bg-secondary); border-radius: 4px;';
+                    cdnIndicator.innerHTML = '<i class="bi bi-speedometer2" style="color: #4CAF50;"></i> CDN加速预览';
+                    cdnIndicator.title = `使用CDN加速: ${data.cdn_url}`;
+                    previewContainer.appendChild(cdnIndicator);
+                } else {
+                    const cdnIndicator = document.createElement('div');
+                    cdnIndicator.style.cssText = 'color: var(--finder-text-secondary); font-size: 10px; margin-top: 5px; text-align: right; padding: 4px 8px; background: var(--finder-bg-secondary); border-radius: 4px;';
+                    cdnIndicator.innerHTML = '<i class="bi bi-cloud-download" style="color: #FF9800;"></i> API预览';
+                    cdnIndicator.title = '使用原始API地址（建议配置CDN以提升速度）';
+                    previewContainer.appendChild(cdnIndicator);
                 }
             })
             .catch(error => {
                 console.error('加载预览失败:', error);
                 document.getElementById('prop-preview-section').style.display = 'none';
             });
+    }
+
+    // 更新容器信息面板
+    function updateContainerInfo() {
+        if (!currentServerId || !currentBucket) {
+            showWelcomePanel();
+            return;
+        }
+
+        // 显示容器信息面板
+        document.getElementById('welcome-panel').style.display = 'none';
+        document.getElementById('container-info-panel').style.display = 'block';
+        document.getElementById('single-file-panel').style.display = 'none';
+        document.getElementById('multi-selection-panel').style.display = 'none';
+
+        // 更新容器信息
+        document.getElementById('container-title').textContent = currentPrefix ? '文件夹' : '存储桶';
+        document.getElementById('container-name').textContent = currentPrefix ? currentPrefix.split('/').filter(Boolean).pop() || '根目录' : currentBucket;
+        document.getElementById('container-type').textContent = currentPrefix ? '文件夹' : 'S3存储桶';
+
+        // 构建完整路径
+        let fullPath = currentBucket;
+        if (currentPrefix) {
+            fullPath += '/' + currentPrefix;
+        }
+        document.getElementById('container-path').textContent = '/' + fullPath;
+
+        // 获取当前文件夹的项目数量
+        const objects = getCurrentFileObjects();
+        document.getElementById('container-count').textContent = objects.length + ' 个项目';
+
+        // 获取并显示CDN状态
+        updateBucketCdnStatus();
+    }
+
+    // 更新桶CDN状态显示
+    function updateBucketCdnStatus() {
+        if (!currentServerId || !currentBucket) {
+            document.getElementById('cdn-status-text').textContent = '未配置';
+            return;
+        }
+
+        fetch(`/api/servers/${currentServerId}/buckets/${currentBucket}/cdn`)
+            .then(response => response.json())
+            .then(data => {
+                const statusText = document.getElementById('cdn-status-text');
+                if (data.cdn_url) {
+                    statusText.innerHTML = `<i class="bi bi-speedometer2" style="color: green;"></i> 已启用`;
+                    statusText.title = `CDN域名: ${data.cdn_url}`;
+                } else {
+                    statusText.innerHTML = `<i class="bi bi-speedometer2" style="color: var(--finder-text-secondary);"></i> 未配置`;
+                    statusText.title = '点击配置CDN加速';
+                }
+            })
+            .catch(error => {
+                console.error('获取CDN配置失败:', error);
+                document.getElementById('cdn-status-text').innerHTML = `<i class="bi bi-exclamation-triangle" style="color: orange;"></i> 获取失败`;
+            });
+    }
+
+    // 显示欢迎面板
+    function showWelcomePanel() {
+        document.getElementById('welcome-panel').style.display = 'block';
+        document.getElementById('container-info-panel').style.display = 'none';
+        document.getElementById('single-file-panel').style.display = 'none';
+        document.getElementById('multi-selection-panel').style.display = 'none';
+    }
+
+    // 清除文件选择
+    function clearFileSelection() {
+        selectedFiles.clear();
+        selectedFile = null;
+        document.querySelectorAll('.file-item.selected, .file-row.selected, .file-item.multi-selected, .file-row.multi-selected, .previewing').forEach(el => {
+            el.classList.remove('selected', 'multi-selected', 'previewing');
+        });
+
+        // 根据当前状态显示合适的面板
+        if (currentServerId && currentBucket) {
+            updateContainerInfo();
+        } else {
+            showWelcomePanel();
+        }
     }
 
     // 更新路径栏
@@ -971,8 +1408,10 @@
         navigationHistory = navigationHistory.slice(0, navigationIndex + 1);
         navigationHistory.push({'bucket': currentBucket, 'prefix': currentPrefix});
         navigationIndex++;
+        currentPage = 1; // 重置到第一页
         loadFiles();
         updateNavigationButtons();
+        saveCurrentState();
     }
 
     // 更新导航按钮状态
@@ -1019,6 +1458,7 @@
         navigationHistory = [];
         navigationIndex = -1;
         selectedFiles.clear();
+        currentPage = 1; // 重置分页
 
         // 显示欢迎页面或服务器列表
         if (currentServerId) {
@@ -1038,6 +1478,7 @@
         document.getElementById('file-properties').style.display = 'none';
         updateNavigationButtons();
         updateStatus('就绪', 'ready');
+        saveCurrentState();
     }
 
     // 返回服务器视图
@@ -1047,6 +1488,7 @@
         navigationHistory = [];
         navigationIndex = -1;
         selectedFiles.clear();
+        currentPage = 1; // 重置分页
 
         if (currentServerId) {
             showBuckets(currentServerId);
@@ -1055,6 +1497,7 @@
         document.getElementById('file-properties').style.display = 'none';
         updateNavigationButtons();
         updateStatus('就绪', 'ready');
+        saveCurrentState();
     }
 
     // 刷新文件列表
@@ -1188,6 +1631,167 @@
         }
     }
 
+    // 编辑服务器
+    function editServer(serverId) {
+        fetch(`/api/servers`)
+            .then(response => response.json())
+            .then(data => {
+                const server = data.servers.find(s => s.id === serverId);
+                if (!server) {
+                    alert('服务器不存在');
+                    return;
+                }
+
+                // 填充表单
+                const form = document.getElementById('edit-server-form');
+                form.server_id.value = server.id;
+                form.name.value = server.name;
+                form.access_key.value = server.access_key;
+                form.secret_key.value = server.secret_key;
+                form.endpoint_url.value = server.endpoint_url;
+                form.region.value = server.region;
+                form.cdn_url.value = server.cdn_url || '';
+
+                showModal('edit-server-modal');
+            })
+            .catch(error => {
+                console.error('获取服务器信息失败:', error);
+                alert('获取服务器信息失败: ' + error.message);
+            });
+    }
+
+    // 更新服务器
+    function updateServer() {
+        const form = document.getElementById('edit-server-form');
+        const formData = new FormData(form);
+        const serverId = formData.get('server_id');
+
+        fetch(`/api/servers/${serverId}`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                name: formData.get('name'),
+                access_key: formData.get('access_key'),
+                secret_key: formData.get('secret_key'),
+                endpoint_url: formData.get('endpoint_url'),
+                region: formData.get('region')
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            closeModal('edit-server-modal');
+            form.reset();
+            loadServers();
+            updateSettingsModal(); // 更新设置模态框显示
+            updateStatus('服务器更新成功', 'ready');
+        })
+        .catch(error => {
+            console.error('更新服务器失败:', error);
+            alert('更新服务器失败: ' + error.message);
+        });
+    }
+
+    // 显示桶CDN配置模态框
+    function showBucketCdnConfig() {
+        if (!currentServerId || !currentBucket) {
+            alert('请先选择服务器和存储桶');
+            return;
+        }
+
+        // 获取当前CDN配置
+        fetch(`/api/servers/${currentServerId}/buckets/${currentBucket}/cdn`)
+            .then(response => response.json())
+            .then(data => {
+                const form = document.getElementById('bucket-cdn-form');
+                form.server_id.value = currentServerId;
+                form.bucket_name.value = currentBucket;
+                form.bucket_display.value = currentBucket;
+                form.cdn_url.value = data.cdn_url || '';
+
+                // 显示或隐藏删除按钮
+                const deleteBtn = document.getElementById('delete-cdn-btn');
+                if (data.cdn_url) {
+                    deleteBtn.style.display = 'inline-block';
+                } else {
+                    deleteBtn.style.display = 'none';
+                }
+
+                showModal('bucket-cdn-modal');
+            })
+            .catch(error => {
+                console.error('获取CDN配置失败:', error);
+                alert('获取CDN配置失败: ' + error.message);
+            });
+    }
+
+    // 保存桶CDN配置
+    function saveBucketCdnConfig() {
+        const form = document.getElementById('bucket-cdn-form');
+        const formData = new FormData(form);
+        const serverId = formData.get('server_id');
+        const bucketName = formData.get('bucket_name');
+        const cdnUrl = formData.get('cdn_url').trim() || null;
+
+        fetch(`/api/servers/${serverId}/buckets/${bucketName}/cdn`, {
+            method: 'PUT',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                cdn_url: cdnUrl
+            })
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            closeModal('bucket-cdn-modal');
+            form.reset();
+            updateBucketCdnStatus(); // 更新CDN状态显示
+            updateStatus('CDN配置保存成功', 'ready');
+        })
+        .catch(error => {
+            console.error('保存CDN配置失败:', error);
+            alert('保存CDN配置失败: ' + error.message);
+        });
+    }
+
+    // 删除桶CDN配置
+    function deleteBucketCdnConfig() {
+        if (!confirm('确定要删除此桶的CDN配置吗？')) {
+            return;
+        }
+
+        const form = document.getElementById('bucket-cdn-form');
+        const formData = new FormData(form);
+        const serverId = formData.get('server_id');
+        const bucketName = formData.get('bucket_name');
+
+        fetch(`/api/servers/${serverId}/buckets/${bucketName}/cdn`, {
+            method: 'DELETE'
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.error) {
+                throw new Error(data.error);
+            }
+            closeModal('bucket-cdn-modal');
+            form.reset();
+            updateBucketCdnStatus(); // 更新CDN状态显示
+            updateStatus('CDN配置删除成功', 'ready');
+        })
+        .catch(error => {
+            console.error('删除CDN配置失败:', error);
+            alert('删除CDN配置失败: ' + error.message);
+        });
+    }
+
     // 创建文件夹
     function createFolder() {
         if (!currentServerId || !currentBucket) {
@@ -1272,37 +1876,100 @@
     }
 
     function uploadFiles(files) {
-        const uploadPromises = files.map(file => {
-            const formData = new FormData();
-            formData.append('file', file);
-            formData.append('bucket', currentBucket);
-            formData.append('prefix', currentPrefix || '');
-
-            return fetch(`/api/servers/${currentServerId}/upload`, {
-                method: 'POST',
-                body: formData
-            });
+        // 添加文件到上传队列
+        files.forEach(file => {
+            const taskId = addUploadTask(file, currentServerId, currentBucket, currentPrefix);
         });
 
-        Promise.all(uploadPromises)
-            .then(responses => Promise.all(responses.map(r => r.json())))
-            .then(results => {
-                const errors = results.filter(r => r.error);
-                if (errors.length > 0) {
-                    alert('部分文件上传失败: ' + errors.map(e => e.error).join(', '));
-                } else {
-                    updateStatus(`成功上传 ${files.length} 个文件`, 'ready');
-                }
+        // 开始处理上传队列
+        processUploadQueue();
+    }
 
-                closeModal('upload-modal');
-                document.getElementById('file-input').value = '';
-                document.getElementById('upload-list').innerHTML = '';
-                loadFiles();
-            })
-            .catch(error => {
-                console.error('上传失败:', error);
-                alert('上传失败: ' + error.message);
+    // 处理上传队列
+    function processUploadQueue() {
+        const pendingTasks = uploadQueue.filter(task => task.status === 'pending');
+        if (pendingTasks.length === 0) return;
+
+        // 同时处理最多3个上传任务
+        const maxConcurrent = 3;
+        const tasksToProcess = pendingTasks.slice(0, maxConcurrent);
+
+        tasksToProcess.forEach(task => {
+            executeUploadTask(task);
+        });
+    }
+
+    function executeUploadTask(task) {
+        if (task.status !== 'pending') return;
+
+        updateUploadTask(task.id, {
+            status: 'uploading',
+            startTime: new Date()
+        });
+
+        updateStatus(`正在上传 ${task.file.name}`, 'loading');
+
+        const formData = new FormData();
+        formData.append('file', task.file);
+        formData.append('bucket', task.bucket);
+        formData.append('prefix', task.prefix);
+
+        // 模拟进度更新（由于无法获取真实进度，使用模拟进度）
+        const progressInterval = setInterval(() => {
+            const currentTask = uploadQueue.find(t => t.id === task.id);
+            if (currentTask && currentTask.status === 'uploading' && currentTask.progress < 90) {
+                updateUploadTask(task.id, {
+                    progress: Math.min(currentTask.progress + Math.random() * 20, 90)
+                });
+            }
+        }, 500);
+
+        fetch(`/api/servers/${task.serverId}/upload`, {
+            method: 'POST',
+            body: formData
+        })
+        .then(response => response.json())
+        .then(data => {
+            clearInterval(progressInterval);
+
+            if (data.error) {
+                updateUploadTask(task.id, {
+                    status: 'error',
+                    error: data.error,
+                    endTime: new Date()
+                });
+            } else {
+                updateUploadTask(task.id, {
+                    status: 'completed',
+                    progress: 100,
+                    endTime: new Date()
+                });
+
+                // 上传成功后刷新文件列表
+                if (currentServerId === task.serverId && currentBucket === task.bucket) {
+                    setTimeout(() => loadFiles(), 500);
+                }
+            }
+
+            // 继续处理队列中的其他任务
+            setTimeout(() => processUploadQueue(), 100);
+        })
+        .catch(error => {
+            clearInterval(progressInterval);
+            updateUploadTask(task.id, {
+                status: 'error',
+                error: error.message,
+                endTime: new Date()
             });
+
+            // 继续处理队列中的其他任务
+            setTimeout(() => processUploadQueue(), 100);
+        });
+    }
+
+    // 显示上传管理页面
+    function showUploads() {
+        showUploadManagement();
     }
 
     // 下载功能
@@ -1344,15 +2011,41 @@
             return;
         }
 
-        // 逐个下载文件
+        // 逐个下载文件，优先使用CDN
         fileKeys.forEach(key => {
-            const url = `/api/servers/${currentServerId}/download?bucket=${currentBucket}&key=${encodeURIComponent(key)}`;
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = key.split('/').pop();
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            // 获取桶级别的CDN配置
+            fetch(`/api/servers/${currentServerId}/buckets/${currentBucket}/cdn`)
+                .then(response => response.json())
+                .then(data => {
+                    let downloadUrl;
+
+                    if (data.cdn_url) {
+                        // 使用CDN URL，构建完整文件路径
+                        const cdnBaseUrl = data.cdn_url.endsWith('/') ? data.cdn_url : data.cdn_url + '/';
+                        downloadUrl = `${cdnBaseUrl}${key}`;
+                    } else {
+                        // 使用API下载URL
+                        downloadUrl = `/api/servers/${currentServerId}/download?bucket=${currentBucket}&key=${encodeURIComponent(key)}`;
+                    }
+
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = key.split('/').pop();
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                })
+                .catch(error => {
+                    console.error('获取CDN配置失败，使用API下载:', error);
+                    // 降级使用API URL
+                    const fallbackUrl = `/api/servers/${currentServerId}/download?bucket=${currentBucket}&key=${encodeURIComponent(key)}`;
+                    const a = document.createElement('a');
+                    a.href = fallbackUrl;
+                    a.download = key.split('/').pop();
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
         });
 
         updateStatus(`正在下载 ${fileKeys.length} 个文件`, 'ready');
@@ -1677,13 +2370,39 @@
     // 单个文件操作
     function downloadSelectedFile() {
         if (selectedFile) {
-            const url = `/api/servers/${currentServerId}/download?bucket=${currentBucket}&key=${encodeURIComponent(selectedFile)}`;
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = selectedFile.split('/').pop();
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            // 获取桶级别的CDN配置
+            fetch(`/api/servers/${currentServerId}/buckets/${currentBucket}/cdn`)
+                .then(response => response.json())
+                .then(data => {
+                    let downloadUrl;
+
+                    if (data.cdn_url) {
+                        // 使用CDN URL，构建完整文件路径
+                        const cdnBaseUrl = data.cdn_url.endsWith('/') ? data.cdn_url : data.cdn_url + '/';
+                        downloadUrl = `${cdnBaseUrl}${selectedFile}`;
+                    } else {
+                        // 使用API下载URL
+                        downloadUrl = `/api/servers/${currentServerId}/download?bucket=${currentBucket}&key=${encodeURIComponent(selectedFile)}`;
+                    }
+
+                    const a = document.createElement('a');
+                    a.href = downloadUrl;
+                    a.download = selectedFile.split('/').pop();
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                })
+                .catch(error => {
+                    console.error('获取CDN配置失败:', error);
+                    // 降级使用API URL
+                    const fallbackUrl = `/api/servers/${currentServerId}/download?bucket=${currentBucket}&key=${encodeURIComponent(selectedFile)}`;
+                    const a = document.createElement('a');
+                    a.href = fallbackUrl;
+                    a.download = selectedFile.split('/').pop();
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                });
         }
     }
 

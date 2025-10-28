@@ -15,6 +15,7 @@
     <!-- 模态框容器 -->
     <div id="modal-container"></div>
 
+    
     <!-- 右键菜单 -->
     <div id="context-menu" class="context-menu">
         <div class="context-menu-item" onclick="refreshFiles()">
@@ -170,6 +171,7 @@
         document.addEventListener('DOMContentLoaded', function() {
             setupDragAndDrop();
             checkFirstRun();
+            loadPersistedState();
         });
 
         // 首次运行检查
@@ -196,6 +198,352 @@
         function showSettingsModal() {}
         function uploadFiles(files) {}
         function selectAllFiles() {}
+
+        // 页面切换时收起上传面板
+        function onPageChange() {
+            // 收起上传面板
+            closeUploadManagement();
+        }
+
+        // 上传管理全局变量
+        let uploadQueue = [];
+        let uploadIdCounter = 0;
+
+        // 上传管理函数
+        function showUploadManagement() {
+            // 显示上传管理面板（文件属性面板保持显示）
+            document.getElementById('upload-management-panel').style.display = 'block';
+            updateUploadList();
+        }
+
+        function closeUploadManagement() {
+            // 隐藏上传管理面板
+            document.getElementById('upload-management-panel').style.display = 'none';
+        }
+
+        function toggleUploadPanel() {
+            const panel = document.getElementById('upload-management-panel');
+            if (panel.style.display === 'none') {
+                showUploadManagement();
+            } else {
+                closeUploadManagement();
+            }
+        }
+
+        function addUploadTask(file, serverId, bucket, prefix) {
+            const taskId = ++uploadIdCounter;
+            const task = {
+                id: taskId,
+                file: file,
+                serverId: serverId,
+                bucket: bucket,
+                prefix: prefix || '',
+                status: 'pending', // pending, uploading, completed, error, cancelled
+                progress: 0,
+                startTime: null,
+                endTime: null,
+                error: null
+            };
+
+            uploadQueue.push(task);
+            updateUploadList();
+            return taskId;
+        }
+
+        function updateUploadTask(taskId, updates) {
+            const task = uploadQueue.find(t => t.id === taskId);
+            if (task) {
+                Object.assign(task, updates);
+                updateUploadList();
+            }
+        }
+
+        function removeUploadTask(taskId) {
+            const index = uploadQueue.findIndex(t => t.id === taskId);
+            if (index > -1) {
+                uploadQueue.splice(index, 1);
+                updateUploadList();
+            }
+        }
+
+        function clearCompletedUploads() {
+            uploadQueue = uploadQueue.filter(task =>
+                task.status !== 'completed' && task.status !== 'error'
+            );
+            updateUploadList();
+        }
+
+        function cancelAllUploads() {
+            uploadQueue.forEach(task => {
+                if (task.status === 'pending' || task.status === 'uploading') {
+                    updateUploadTask(task.id, { status: 'cancelled' });
+                }
+            });
+        }
+
+        function updateUploadList() {
+            const uploadList = document.getElementById('upload-list');
+            const uploadStats = document.getElementById('upload-stats');
+
+            const activeUploads = uploadQueue.filter(task =>
+                task.status === 'uploading' || task.status === 'pending'
+            );
+            const completedUploads = uploadQueue.filter(task => task.status === 'completed').length;
+            const totalSize = uploadQueue.reduce((sum, task) => sum + task.file.size, 0);
+
+            uploadStats.textContent = `${activeUploads.length} 个进行中 | ${completedUploads} 个已完成 | 总计 ${formatFileSize(totalSize)}`;
+
+            if (uploadQueue.length === 0) {
+                uploadList.innerHTML = `
+                    <div class="empty-state">
+                        <i class="bi bi-cloud-upload" style="font-size: 48px; color: var(--finder-text-secondary);"></i>
+                        <p style="color: var(--finder-text-secondary); margin-top: 10px;">暂无上传任务</p>
+                    </div>
+                `;
+                return;
+            }
+
+            let html = '';
+            uploadQueue.forEach(task => {
+                const statusClass = {
+                    'pending': 'status-pending',
+                    'uploading': 'status-uploading',
+                    'completed': 'status-completed',
+                    'error': 'status-error',
+                    'cancelled': 'status-cancelled'
+                }[task.status];
+
+                const statusText = {
+                    'pending': '等待中',
+                    'uploading': '上传中',
+                    'completed': '已完成',
+                    'error': '失败',
+                    'cancelled': '已取消'
+                }[task.status];
+
+                const progressVisible = task.status === 'uploading' ? 'visible' : 'hidden';
+                const canCancel = task.status === 'pending' || task.status === 'uploading';
+                const canRemove = task.status === 'completed' || task.status === 'error' || task.status === 'cancelled';
+
+                html += `
+                    <div class="upload-item ${statusClass}">
+                        <div class="upload-item-info">
+                            <div class="upload-item-name" title="${task.file.name}">
+                                <i class="bi bi-file-earmark"></i>
+                                ${task.file.name}
+                            </div>
+                            <div class="upload-item-details">
+                                <span class="upload-item-status">${statusText}</span>
+                                <span class="upload-item-size">${formatFileSize(task.file.size)}</span>
+                            </div>
+                        </div>
+                        <div class="upload-item-controls">
+                            <button class="btn btn-sm btn-cancel" onclick="cancelUpload(${task.id})"
+                                style="display: ${canCancel ? 'inline-block' : 'none'};">
+                                <i class="bi bi-x"></i>
+                            </button>
+                            <button class="btn btn-sm btn-remove" onclick="removeUploadTask(${task.id})"
+                                style="display: ${canRemove ? 'inline-block' : 'none'};">
+                                <i class="bi bi-trash"></i>
+                            </button>
+                        </div>
+                        <div class="upload-progress" style="display: ${progressVisible};">
+                            <div class="upload-progress-bar" style="width: ${task.progress}%;"></div>
+                        </div>
+                        ${task.error ? `<div class="upload-error">${task.error}</div>` : ''}
+                    </div>
+                `;
+            });
+
+            uploadList.innerHTML = html;
+        }
+
+        function cancelUpload(taskId) {
+            updateUploadTask(taskId, { status: 'cancelled' });
+        }
+
+        // 状态持久化功能
+        function saveCurrentState() {
+            const state = {
+                serverId: currentServerId,
+                bucket: currentBucket,
+                prefix: currentPrefix,
+                currentPage: currentPage,
+                itemsPerPage: itemsPerPage,
+                timestamp: Date.now()
+            };
+            localStorage.setItem('s3-finder-state', JSON.stringify(state));
+        }
+
+        function loadPersistedState() {
+            try {
+                const savedState = localStorage.getItem('s3-finder-state');
+                if (savedState) {
+                    const state = JSON.parse(savedState);
+
+                    // 检查状态是否在24小时内
+                    const isRecent = Date.now() - state.timestamp < 24 * 60 * 60 * 1000;
+
+                    if (isRecent && state.serverId) {
+                        // 恢复服务器状态
+                        fetch('/api/servers')
+                            .then(response => response.json())
+                            .then(data => {
+                                const server = data.servers.find(s => s.id === state.serverId);
+                                if (server) {
+                                    currentServerId = state.serverId;
+                                    loadServers();
+
+                                    // 如果有桶信息，恢复到桶级别
+                                    if (state.bucket) {
+                                        setTimeout(() => {
+                                            navigateToBucket(state.bucket);
+                                            if (state.prefix) {
+                                                currentPrefix = state.prefix;
+                                            }
+                                            // 恢复分页设置
+                                            if (state.currentPage) {
+                                                currentPage = state.currentPage;
+                                            }
+                                            if (state.itemsPerPage) {
+                                                itemsPerPage = state.itemsPerPage;
+                                                // 更新分页显示设置
+                                                const perPageSelect = document.getElementById('items-per-page');
+                                                if (perPageSelect) {
+                                                    perPageSelect.value = itemsPerPage;
+                                                }
+                                            }
+                                            loadFiles();
+                                        }, 500);
+                                    }
+                                }
+                            })
+                            .catch(error => {
+                                console.error('加载保存的状态失败:', error);
+                                showAllServersBuckets();
+                            });
+                    } else {
+                        // 状态过期或无效，显示所有服务器的桶
+                        showAllServersBuckets();
+                    }
+                } else {
+                    // 没有保存的状态，显示所有服务器的桶
+                    showAllServersBuckets();
+                }
+            } catch (error) {
+                console.error('解析保存的状态失败:', error);
+                showAllServersBuckets();
+            }
+        }
+
+        function showAllServersBuckets() {
+            fetch('/api/servers')
+                .then(response => response.json())
+                .then(data => {
+                    if (data.servers.length === 0) {
+                        showSettingsModal();
+                        return;
+                    }
+
+                    // 显示所有服务器的桶
+                    displayAllBuckets(data.servers);
+                })
+                .catch(error => {
+                    console.error('加载服务器失败:', error);
+                    updateStatus('加载服务器失败', 'error');
+                });
+        }
+
+        function displayAllBuckets(servers) {
+            const filesContainer = document.getElementById('finder-files');
+            filesContainer.innerHTML = '<div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--finder-text-secondary);"><div style="font-size: 48px; margin-bottom: 20px;"><i class="bi bi-cloud"></i></div><h3 style="margin-bottom: 10px;">正在加载存储桶...</h3></div>';
+
+            let allBuckets = [];
+            let loadedCount = 0;
+
+            servers.forEach(server => {
+                fetch(`/api/servers/${server.id}/buckets`)
+                    .then(response => response.json())
+                    .then(data => {
+                        allBuckets.push(...data.buckets.map(bucket => ({
+                            ...bucket,
+                            serverId: server.id,
+                            serverName: server.name
+                        })));
+                        loadedCount++;
+
+                        if (loadedCount === servers.length) {
+                            displayBucketsGrid(allBuckets);
+                        }
+                    })
+                    .catch(error => {
+                        console.error(`加载服务器 ${server.name} 的桶失败:`, error);
+                        loadedCount++;
+
+                        if (loadedCount === servers.length) {
+                            displayBucketsGrid(allBuckets);
+                        }
+                    });
+            });
+        }
+
+        function displayBucketsGrid(buckets) {
+            const filesContainer = document.getElementById('finder-files');
+
+            if (buckets.length === 0) {
+                filesContainer.innerHTML = `
+                    <div style="display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100%; color: var(--finder-text-secondary);">
+                        <div style="font-size: 48px; margin-bottom: 20px;">
+                            <i class="bi bi-folder-x"></i>
+                        </div>
+                        <h3 style="margin-bottom: 10px;">暂无存储桶</h3>
+                        <p>请先在S3服务中创建存储桶</p>
+                        <button class="btn btn-primary" onclick="showSettingsModal()">
+                            <i class="bi bi-gear"></i> 管理服务器
+                        </button>
+                    </div>
+                `;
+                showWelcomePanel();
+                return;
+            }
+
+            let html = '<div class="files-grid">';
+            buckets.forEach(bucket => {
+                html += `
+                    <div class="file-item" onclick="enterBucketFromAllServers('${bucket.serverId}', '${bucket.key}')" ondblclick="enterBucketFromAllServers('${bucket.serverId}', '${bucket.key}')">
+                        <div class="file-icon">
+                            <i class="bi bi-bucket"></i>
+                        </div>
+                        <div class="file-name">${bucket.name}</div>
+                        <div class="file-size" style="font-size: 10px; color: var(--finder-text-secondary);">${bucket.serverName}</div>
+                        <div class="file-size">${bucket.last_modified || ''}</div>
+                    </div>
+                `;
+            });
+            html += '</div>';
+
+            filesContainer.innerHTML = html;
+            showWelcomePanel();
+            updateStatus(`显示 ${buckets.length} 个存储桶`, 'ready');
+        }
+
+        function enterBucketFromAllServers(serverId, bucketName) {
+            currentServerId = serverId;
+            currentBucket = bucketName;
+            currentPrefix = '';
+            navigationHistory = [{'bucket': bucketName, 'prefix': ''}];
+            navigationIndex = 0;
+
+            // 更新侧边栏选中状态
+            loadServers();
+
+            // 加载文件
+            loadFiles();
+            updateNavigationButtons();
+
+            // 保存状态
+            saveCurrentState();
+        }
     </script>
     {% block scripts %}{% endblock %}
 </body>

@@ -38,7 +38,8 @@ class ConfigManager:
             'access_key': access_key,
             'secret_key': secret_key,
             'endpoint_url': endpoint_url,
-            'region': region
+            'region': region,
+            'bucket_cdn_configs': {}
         }
         self.config_data['servers'].append(server)
         self.save_config()
@@ -68,3 +69,45 @@ class ConfigManager:
             if server['id'] == server_id:
                 return server
         return None
+
+    def get_bucket_cdn_config(self, server_id, bucket_name):
+        """获取指定桶的CDN配置"""
+        server = self.get_server(server_id)
+        if not server:
+            return None
+
+        # 初始化桶CDN配置（如果不存在）
+        if 'bucket_cdn_configs' not in server:
+            server['bucket_cdn_configs'] = {}
+
+        return server['bucket_cdn_configs'].get(bucket_name)
+
+    def set_bucket_cdn_config(self, server_id, bucket_name, cdn_url):
+        """设置指定桶的CDN配置"""
+        server = self.get_server(server_id)
+        if not server:
+            return False
+
+        # 初始化桶CDN配置（如果不存在）
+        if 'bucket_cdn_configs' not in server:
+            server['bucket_cdn_configs'] = {}
+
+        if cdn_url:
+            server['bucket_cdn_configs'][bucket_name] = cdn_url
+        else:
+            # 如果CDN URL为空，则删除配置
+            server['bucket_cdn_configs'].pop(bucket_name, None)
+
+        return self.save_config()
+
+    def delete_bucket_cdn_config(self, server_id, bucket_name):
+        """删除指定桶的CDN配置"""
+        return self.set_bucket_cdn_config(server_id, bucket_name, None)
+
+    def get_server_bucket_cdn_configs(self, server_id):
+        """获取服务器所有桶的CDN配置"""
+        server = self.get_server(server_id)
+        if not server:
+            return {}
+
+        return server.get('bucket_cdn_configs', {})

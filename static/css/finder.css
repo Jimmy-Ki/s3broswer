@@ -794,6 +794,279 @@ body {
   color: var(--finder-text) !important;
 }
 
+/* 上传管理页面样式 */
+.upload-page-content {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+}
+
+.upload-page-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 20px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--finder-border);
+}
+
+.upload-page-header h2 {
+  margin: 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+/* 右侧上传面板样式 */
+.upload-management-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background-color: var(--finder-bg);
+}
+
+.upload-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid var(--finder-border);
+}
+
+.upload-panel-header h3 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.upload-panel-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 16px;
+  border-bottom: 1px solid var(--finder-border);
+}
+
+.upload-panel-stats {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--finder-border);
+  background-color: var(--finder-toolbar-bg);
+}
+
+.upload-panel-stats span {
+  font-size: 13px;
+  color: var(--finder-text-secondary);
+  font-weight: 500;
+}
+
+.upload-panel-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: 8px;
+}
+
+.upload-controls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.upload-page-list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  padding: 40px 20px;
+}
+
+/* 面板中的空状态样式 */
+.upload-panel-list .empty-state {
+  padding: 20px 16px;
+  min-height: 200px;
+}
+
+/* 模态框中的上传控件样式（保留兼容性） */
+.modal .upload-controls {
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--finder-border);
+  margin-bottom: 10px;
+}
+
+.upload-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border: 1px solid var(--finder-border);
+  border-radius: 6px;
+  background-color: white;
+  position: relative;
+}
+
+/* 右侧面板中的上传项目样式 */
+.upload-management-panel .upload-item {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  margin-bottom: 4px;
+}
+
+.upload-management-panel .upload-item-info {
+  width: 100%;
+}
+
+.upload-management-panel .upload-item-name {
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  width: 100%;
+}
+
+.upload-management-panel .upload-item-details {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  width: 100%;
+  margin-top: 2px;
+}
+
+.upload-management-panel .upload-item-status {
+  font-size: 11px;
+  color: var(--finder-text-secondary);
+}
+
+.upload-management-panel .upload-item-size {
+  font-size: 11px;
+  color: var(--finder-text-secondary);
+}
+
+.upload-management-panel .upload-item-controls {
+  display: flex;
+  gap: 4px;
+  align-self: flex-end;
+}
+
+.upload-management-panel .upload-progress {
+  height: 2px;
+  margin-top: 4px;
+}
+
+.upload-item:hover {
+  border-color: var(--finder-hover);
+}
+
+.upload-item-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.upload-item-name {
+  font-weight: 500;
+  margin-bottom: 4px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--finder-text);
+}
+
+.upload-item-name i {
+  margin-right: 6px;
+  color: var(--finder-text-secondary);
+}
+
+.upload-item-details {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--finder-text-secondary);
+}
+
+.upload-item-controls {
+  display: flex;
+  gap: 4px;
+}
+
+.upload-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 3px;
+  background-color: var(--finder-hover);
+  border-radius: 0 0 6px 6px;
+  overflow: hidden;
+}
+
+.upload-progress-bar {
+  height: 100%;
+  background-color: var(--finder-blue);
+  transition: width 0.3s ease;
+}
+
+.upload-error {
+  font-size: 12px;
+  color: #dc3545;
+  margin-top: 4px;
+}
+
+/* 上传状态样式 */
+.upload-item.status-pending {
+  border-left: 3px solid #6c757d;
+}
+
+.upload-item.status-uploading {
+  border-left: 3px solid var(--finder-blue);
+}
+
+.upload-item.status-completed {
+  border-left: 3px solid #28a745;
+}
+
+.upload-item.status-error {
+  border-left: 3px solid #dc3545;
+}
+
+.upload-item.status-cancelled {
+  border-left: 3px solid #6c757d;
+  opacity: 0.6;
+}
+
+.btn-cancel {
+  background-color: #ffc107;
+  border-color: #ffc107;
+  color: #212529;
+}
+
+.btn-cancel:hover {
+  background-color: #e0a800;
+  border-color: #d39e00;
+}
+
+.btn-remove {
+  background-color: #dc3545;
+  border-color: #dc3545;
+}
+
+.btn-remove:hover {
+  background-color: #c82333;
+  border-color: #bd2130;
+}
+
 .file-item.temp-selected .file-size,
 .file-row.temp-selected .file-row-size,
 .file-row.temp-selected .file-row-date {

@@ -17,7 +17,7 @@ app = Flask(__name__)
 app.config['SECRET_KEY'] = os.urandom(24)
 app.config['SESSION_TYPE'] = 'filesystem'
 app.config['UPLOAD_FOLDER'] = 'uploads'
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB
+app.config['MAX_CONTENT_LENGTH'] = 1024 * 1024 * 1024  # 1GB
 
 # 确保上传目录存在
 os.makedirs(app.config['UPLOAD_FOLDER'], exist_ok=True)
@@ -89,6 +89,47 @@ def add_server():
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
+@app.route('/api/servers/<int:server_id>', methods=['PUT'])
+def update_server(server_id):
+    """更新S3服务器配置"""
+    try:
+        data = request.get_json()
+
+        # 验证服务器是否存在
+        existing_server = config_manager.get_server(server_id)
+        if not existing_server:
+            return jsonify({'error': '服务器不存在'}), 404
+
+        # 验证必填字段
+        required_fields = ['name', 'access_key', 'secret_key', 'endpoint_url']
+        for field in required_fields:
+            if not data.get(field):
+                return jsonify({'error': f'缺少必填字段: {field}'}), 400
+
+        # 更新服务器配置
+        update_data = {
+            'name': data['name'],
+            'access_key': data['access_key'],
+            'secret_key': data['secret_key'],
+            'endpoint_url': data['endpoint_url'],
+            'region': data.get('region', 'us-east-1')
+        }
+
+        success = config_manager.update_server(server_id, **update_data)
+        if not success:
+            return jsonify({'error': '更新服务器配置失败'}), 500
+
+        # 清理客户端缓存以重新连接
+        if server_id in s3_clients:
+            del s3_clients[server_id]
+
+        # 返回更新后的配置
+        updated_server = config_manager.get_server(server_id)
+        return jsonify({'server': updated_server})
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
 @app.route('/api/servers/<int:server_id>', methods=['DELETE'])
 def delete_server(server_id):
     """删除S3服务器配置"""
@@ -121,13 +162,78 @@ def list_objects(server_id):
     try:
         bucket = request.args.get('bucket')
         prefix = request.args.get('prefix', '')
+        page = int(request.args.get('page', 1))
+        per_page = int(request.args.get('per_page', 100))
 
         if not bucket:
             return jsonify({'error': '缺少存储桶名称'}), 400
 
         client = get_s3_client(server_id)
         objects = client.list_objects(bucket, prefix)
-        return jsonify({'objects': objects})
+
+        # 实现简单的分页
+        total_objects = len(objects)
+        total_pages = (total_objects + per_page - 1) // per_page
+        start_index = (page - 1) * per_page
+        end_index = start_index + per_page
+        paginated_objects = objects[start_index:end_index]
+
+        return jsonify({
+            'objects': paginated_objects,
+            'pagination': {
+                'page': page,
+                'per_page': per_page,
+                'total': total_objects,
+                'total_pages': total_pages,
+                'has_next': page < total_pages,
+                'has_prev': page > 1
+            }
+        })
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/servers/<int:server_id>/buckets/<bucket_name>/cdn', methods=['GET'])
+def get_bucket_cdn_config(server_id, bucket_name):
+    """获取指定桶的CDN配置"""
+    try:
+        cdn_config = config_manager.get_bucket_cdn_config(server_id, bucket_name)
+        return jsonify({'cdn_url': cdn_config})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/servers/<int:server_id>/buckets/<bucket_name>/cdn', methods=['PUT'])
+def set_bucket_cdn_config(server_id, bucket_name):
+    """设置指定桶的CDN配置"""
+    try:
+        data = request.get_json()
+        cdn_url = data.get('cdn_url', '').strip() or None
+
+        success = config_manager.set_bucket_cdn_config(server_id, bucket_name, cdn_url)
+        if not success:
+            return jsonify({'error': '设置CDN配置失败'}), 500
+
+        return jsonify({'cdn_url': cdn_url})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/servers/<int:server_id>/buckets/<bucket_name>/cdn', methods=['DELETE'])
+def delete_bucket_cdn_config(server_id, bucket_name):
+    """删除指定桶的CDN配置"""
+    try:
+        success = config_manager.delete_bucket_cdn_config(server_id, bucket_name)
+        if not success:
+            return jsonify({'error': '删除CDN配置失败'}), 500
+
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/api/servers/<int:server_id>/cdn-configs', methods=['GET'])
+def get_server_bucket_cdn_configs(server_id):
+    """获取服务器所有桶的CDN配置"""
+    try:
+        configs = config_manager.get_server_bucket_cdn_configs(server_id)
+        return jsonify({'bucket_cdn_configs': configs})
     except Exception as e:
         return jsonify({'error': str(e)}), 500
 
@@ -288,6 +394,9 @@ def preview_file(server_id):
 
         client = get_s3_client(server_id)
 
+        # 获取桶级别的CDN配置
+        cdn_base_url = config_manager.get_bucket_cdn_config(server_id, bucket)
+
         # 创建临时文件
         temp_dir = tempfile.gettempdir()
         filename = key.split('/')[-1]
@@ -304,12 +413,26 @@ def preview_file(server_id):
             file_size = os.path.getsize(temp_path)
             file_ext = os.path.splitext(filename)[1].lower()
 
-            # 限制预览文件大小 (10MB)
-            if file_size > 10 * 1024 * 1024:
+            # 生成CDN URL和API下载URL
+            cdn_url = generate_cdn_url(cdn_base_url, key)
+            api_download_url = f"/api/servers/{server_id}/download?bucket={bucket}&key={key}"
+            download_url = cdn_url or api_download_url
+
+            # 根据文件类型判断是否可以预览（流媒体和PDF无大小限制）
+            content_type = get_content_type(file_ext)
+            is_streamable = (
+                content_type.startswith('video/') or
+                content_type.startswith('audio/') or
+                content_type == 'application/pdf'
+            )
+
+            # 非流媒体文件限制预览文件大小 (10MB)
+            if not is_streamable and file_size > 10 * 1024 * 1024:
                 os.remove(temp_path)
                 return jsonify({
                     'error': '文件太大，无法预览',
-                    'download_url': f"/api/servers/{server_id}/download?bucket={bucket}&key={key}"
+                    'download_url': download_url,
+                    'cdn_url': cdn_url
                 }), 413
 
             # 根据文件类型处理
@@ -324,7 +447,20 @@ def preview_file(server_id):
                     'content_type': content_type,
                     'preview_type': 'pdf_embed',
                     'preview_url': preview_data.get('url'),
-                    'download_url': preview_data.get('download_url')
+                    'download_url': cdn_url or preview_data.get('download_url'),
+                    'cdn_url': cdn_url
+                })
+
+            # 处理媒体文件预览的字典返回
+            if isinstance(preview_data, dict) and preview_data.get('type') == 'media_embed':
+                return jsonify({
+                    'filename': filename,
+                    'size': file_size,
+                    'content_type': preview_data.get('content_type'),
+                    'preview_type': 'media_embed',
+                    'preview_url': preview_data.get('url'),
+                    'download_url': cdn_url or preview_data.get('download_url'),
+                    'cdn_url': cdn_url
                 })
 
             return jsonify({
@@ -332,7 +468,8 @@ def preview_file(server_id):
                 'size': file_size,
                 'content_type': content_type,
                 'preview': preview_data,
-                'download_url': f"/api/servers/{server_id}/download?bucket={bucket}&key={key}"
+                'download_url': download_url,
+                'cdn_url': cdn_url
             })
 
         finally:
@@ -342,6 +479,18 @@ def preview_file(server_id):
 
     except Exception as e:
         return jsonify({'error': str(e)}), 500
+
+def generate_cdn_url(cdn_base_url, key):
+    """生成CDN访问URL"""
+    if not cdn_base_url:
+        return None
+
+    # 确保CDN URL以/结尾
+    if not cdn_base_url.endswith('/'):
+        cdn_base_url += '/'
+
+    # 构建完整的CDN URL（不包含桶名）
+    return f"{cdn_base_url}{key}"
 
 def get_content_type(file_ext):
     """根据文件扩展名获取MIME类型"""
@@ -419,26 +568,56 @@ def process_file_preview(file_path, file_ext, content_type, server_id=None, buck
                     return "二进制文件，无法预览内容"
 
         elif content_type == 'application/pdf':
-            # PDF文件 - 构建MinIO预览URL
+            # PDF文件 - 优先使用CDN，否则使用API预览URL
             if server_id and bucket and key:
-                server_config = None
-                for server in config_manager.get_servers():
-                    if server['id'] == server_id:
-                        server_config = server
-                        break
+                # 获取桶级别的CDN配置
+                cdn_base_url = config_manager.get_bucket_cdn_config(server_id, bucket)
 
-                if server_config:
-                    # 构建预览URL，使用MinIO的内置预览功能
-                    preview_url = f"{server_config['endpoint_url']}/{bucket}/{key}?response-content-disposition=inline"
+                if cdn_base_url:
+                    # 使用CDN URL
+                    cdn_url = generate_cdn_url(cdn_base_url, key)
+                    return {
+                        'type': 'pdf_embed',
+                        'url': cdn_url,
+                        'download_url': f"/api/servers/{server_id}/download?bucket={bucket}&key={key}"
+                    }
+                else:
+                    # 使用API预览URL
+                    preview_url = f"/api/servers/{server_id}/download?bucket={bucket}&key={key}&response-content-disposition=inline"
                     return {
                         'type': 'pdf_embed',
                         'url': preview_url,
                         'download_url': f"/api/servers/{server_id}/download?bucket={bucket}&key={key}"
                     }
-                else:
-                    return "PDF文档预览不可用"
             else:
                 return "PDF文档预览不可用"
+
+        elif content_type.startswith('video/') or content_type.startswith('audio/'):
+            # 视频和音频文件 - 优先使用CDN，否则使用API URL
+            if server_id and bucket and key:
+                # 获取桶级别的CDN配置
+                cdn_base_url = config_manager.get_bucket_cdn_config(server_id, bucket)
+
+                if cdn_base_url:
+                    # 使用CDN URL
+                    cdn_url = generate_cdn_url(cdn_base_url, key)
+                    return {
+                        'type': 'media_embed',
+                        'url': cdn_url,
+                        'content_type': content_type,
+                        'download_url': f"/api/servers/{server_id}/download?bucket={bucket}&key={key}"
+                    }
+                else:
+                    # 使用API URL
+                    api_url = f"/api/servers/{server_id}/download?bucket={bucket}&key={key}"
+                    return {
+                        'type': 'media_embed',
+                        'url': api_url,
+                        'content_type': content_type,
+                        'download_url': api_url
+                    }
+            else:
+                return f"{content_type.split('/')[0].capitalize()}文件预览不可用"
 
         elif file_ext in ['.db', '.sqlite', '.sqlite3']:
             # 数据库文件
@@ -518,7 +697,7 @@ def get_csv_preview(csv_path):
 
 @app.errorhandler(413)
 def too_large(e):
-    return jsonify({'error': '文件太大，最大支持100MB'}), 413
+    return jsonify({'error': '文件太大，最大支持1GB'}), 413
 
 @app.errorhandler(404)
 def not_found(e):
